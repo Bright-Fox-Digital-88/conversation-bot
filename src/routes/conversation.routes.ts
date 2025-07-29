@@ -3,14 +3,14 @@ import { spawn } from 'child_process';
 
 const router = express.Router();
 
-router.post('/twilio', (req, res) => {
+router.post('/', (req, res) => {
   const { Body } = req.body;
 
   if (!Body || typeof Body !== 'string') {
     return res.status(400).json({ error: 'Invalid or missing Body field' });
   }
 
-  console.log('[HTTP] Received Twilio webhook:', Body);
+  console.log('[HTTP] Received webhook:', Body);
   
   try {
     // Spawn dedicated Twilio handler process for state management with path resolution
