@@ -2,7 +2,7 @@ import { ConversationState, SystemMessage } from '@models/conversation/conversat
 import { getSystemMessages } from '@repositories/conversation/conversation.repo';
 import { sendText } from '@utilities/twilio';
 import { config } from 'dotenv';
-config({ path: 'custom.env' });
+config({ path: '.env.local' });
 
 // Load target phone number from .env
 const TARGET_NUMBER = process.env.TARGET_NUMBER!;

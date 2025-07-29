@@ -9,7 +9,7 @@ import {
 } from './conversationRuntime';
 import { config } from 'dotenv';
 
-config({ path: 'custom.env' });
+config({ path: '.env.local' });
 
 const TARGET_NUMBER = process.env.TARGET_NUMBER!;
 if (!TARGET_NUMBER) {

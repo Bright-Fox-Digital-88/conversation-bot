@@ -5,11 +5,13 @@
   "dependencies": {
     "@zohocrm/typescript-sdk-2.1": "^1.1.0",
     "@zohocrm/typescript-sdk-8.0": "^2.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "form-data": "^4.0.3",
     "got": "^14.4.7",
     "moment-timezone": "^0.6.0",
+    "morgan": "^1.10.0",
     "ts-node": "^10.9.2",
     "twilio": "^5.8.0",
     "typescript": "^5.8.3",
@@ -22,7 +24,9 @@
     "dev": "npx ts-node -r ./tsconfig-paths-bootstrap.js ws-server.ts"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
+    "@types/morgan": "^1.9.9",
     "@types/ws": "^8.18.1",
     "tsconfig-paths": "^4.2.0"
   }

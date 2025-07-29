@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { SMSMessageParams, TwilioConfig, TwilioServiceResponse, TwilioMessageResponse } from '@models/twilio/twilio.model';
 
 // Load environment variables from custom.env
-config({ path: 'custom.env' });
+config({ path: '.env.local' });
 
 // Initialize Twilio configuration from environment variables
 const twilioConfig: TwilioConfig = {
