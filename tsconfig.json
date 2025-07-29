@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "es2018",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@/*":["src/*"],
+            "@models/*": ["src/models/*"],
+            "@services/*": ["src/services/*"],
+            "@routes/*": ["src/routes/*"],
+            "@utilities/*": ["src/utilities/*"],
+            "@controllers/*": ["src/controllers/*"],
+            "@repositories/*": ["src/repositories/*"]
+        },
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "outDir": "./dist",
+        "rootDir": ".",
+        "resolveJsonModule": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "testing-scripts/**/*", "code-examples/**/*"]
+} 

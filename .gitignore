@@ -1,0 +1,31 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+custom.env
+# toy front end
+toy-front-end/
+# Build output
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+
+# Misc
+*.sublime-workspace
+*.sublime-project 

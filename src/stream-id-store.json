@@ -1,0 +1,70 @@
+{
+    "sally-scanner": {
+        "id": "6884220000000949031",
+        "notes": [],
+        "tags": []
+    },
+    "michael-merge": {
+        "id": "6884220000000946009",
+        "notes": [],
+        "tags": []
+    },
+    "mike-merge": {
+        "id": "6884220000000937037",
+        "notes": [],
+        "tags": []
+    },
+    "eliza-enrichment": {
+        "id": "6884220000000960018",
+        "notes": [],
+        "tags": []
+    },
+    "larry-leads": {
+        "id": "6884220000000933011",
+        "notes": [],
+        "tags": []
+    },
+    "tommy-tracker": {
+        "id": "6884220000000940027",
+        "notes": [],
+        "tags": []
+    },
+    "sarah-signal": {
+        "id": "6884220000000938022",
+        "notes": [],
+        "tags": []
+    },
+    "taylor-trade": {
+        "id": "6884220000000957026",
+        "notes": [
+            {
+                "note-name": "Equity",
+                "id": "6884220000000933016"
+            },
+            {
+                "note-name": "Appraisal Text Sent",
+                "id": "6884220000000933017"
+            },
+            {
+                "note-name": "Appraisal Text: Transcript",
+                "id": "6884220000000933018"
+            }
+        ],
+        "tags": [
+            {
+                "tag-name": "Trade In Opportunity",
+                "id": "tag_0"
+            }
+        ]
+    },
+    "barry-buyer": {
+        "id": "6884220000000957021",
+        "notes": [],
+        "tags": []
+    },
+    "carl-contact": {
+        "id": "6884220000000940022",
+        "notes": [],
+        "tags": []
+    }
+}

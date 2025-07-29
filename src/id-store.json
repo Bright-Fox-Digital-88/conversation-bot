@@ -1,0 +1,80 @@
+{
+    "sally-scanner": [
+        {
+            "name": "sally-scanner",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "michael-merge": [
+        {
+            "name": "michael-merge",
+            "id": null,
+            "notes": [],
+            "tags": []
+        },
+        {
+            "name": "mike-merge",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "eliza-enrichment": [
+        {
+            "name": "eliza-enrichment",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "larry-leads": [
+        {
+            "name": "larry-leads",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "tommy-tracker": [
+        {
+            "name": "tommy-tracker",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "sarah-signal": [
+        {
+            "name": "sarah-signal",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "taylor-trade": [
+        {
+            "name": "taylor-trade",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "barry-buyer": [
+        {
+            "name": "barry-buyer",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ],
+    "kevin-kontact": [
+        {
+            "name": "kevin-kontact",
+            "id": null,
+            "notes": [],
+            "tags": []
+        }
+    ]
+}
