@@ -54,3 +54,8 @@ export function startTimer() {
     }
   }, 60 * 1000); // Every minute
 }
+
+// Export a function to check if timer is active
+export function isTimerActive(): boolean {
+  return state.timer !== null;
+}

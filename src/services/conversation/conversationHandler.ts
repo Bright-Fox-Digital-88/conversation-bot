@@ -1,6 +1,7 @@
 import { getConversationScript } from '@repositories/conversation/conversation.repo';
 import { sendText } from '@utilities/twilio';
 import { stateManager } from './stateManager';
+import { startTimer } from './conversationRuntime';
 import { config } from 'dotenv';
 
 config({ path: '.env.local' });
@@ -22,9 +23,44 @@ export async function handleConversationMessage(message: string): Promise<{
   try {
     console.log('[ConversationHandler] Processing message:', message);
     
-    // Check for reset command
+    // Check for reset and init commands
     const shouldReset = message.toLowerCase().includes('reset');
+    const shouldInit = message.toLowerCase().includes('init');
     
+    // Handle reset + init combination
+    if (shouldReset && shouldInit) {
+      console.log('[ConversationHandler] Reset + Init command detected, resetting state and starting conversation');
+      stateManager.resetState();
+      
+      // Send the first message and start timer
+      const firstMessage = convoReply[0];
+      console.log(`[ConversationHandler] Sending first message: "${firstMessage}"`);
+      
+      const twilioResponse = await sendText(TARGET_NUMBER, firstMessage);
+      
+      if (twilioResponse.success) {
+        console.log('[ConversationHandler] ✅ First message sent successfully');
+        stateManager.incrementIndex();
+        startTimer();
+        
+        return {
+          success: true,
+          message: 'Conversation reset and initiated with first message',
+          currentIndex: 1,
+          totalMessages: convoReply.length
+        };
+      } else {
+        console.error('[ConversationHandler] ❌ First message failed to send');
+        return {
+          success: false,
+          error: `Failed to send first message: ${twilioResponse.error?.message || 'Unknown error'}`,
+          currentIndex: 0,
+          totalMessages: convoReply.length
+        };
+      }
+    }
+    
+    // Handle reset only
     if (shouldReset) {
       console.log('[ConversationHandler] Reset command detected, resetting state');
       stateManager.resetState();
@@ -32,6 +68,17 @@ export async function handleConversationMessage(message: string): Promise<{
         success: true,
         message: 'Conversation state reset',
         currentIndex: 0,
+        totalMessages: convoReply.length
+      };
+    }
+    
+    // Handle init only - should do nothing
+    if (shouldInit && !shouldReset) {
+      console.log('[ConversationHandler] Init command detected without reset - ignoring');
+      return {
+        success: true,
+        message: 'Init command ignored - must include reset to start conversation',
+        currentIndex: stateManager.getCurrentIndex(),
         totalMessages: convoReply.length
       };
     }

@@ -18,7 +18,7 @@ if (!TARGET_NUMBER) {
 
 const convoReply = getConversationScript();
 
-export async function handleConversation(reset: boolean) {
+export async function handleConversation(reset: boolean, init: boolean = false) {
   stopTimer(); // Always reset the timer before continuing
 
   if (reset) {
@@ -55,5 +55,8 @@ export async function handleConversation(reset: boolean) {
     });
   }
 
-  startTimer();
+  // Start timer if this is an init message or if both reset and init are true
+  if (init || (reset && init)) {
+    startTimer();
+  }
 }
