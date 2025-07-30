@@ -1,9 +1,9 @@
 import express from 'express';
-import { spawn } from 'child_process';
+import { handleConversationMessage, getConversationStatus, resetConversation } from '@services/conversation/conversationHandler';
 
 const router = express.Router();
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { Body } = req.body;
 
   if (!Body || typeof Body !== 'string') {
@@ -13,44 +13,54 @@ router.post('/', (req, res) => {
   console.log('[HTTP] Received webhook:', Body);
   
   try {
-    // Spawn dedicated Twilio handler process for state management with path resolution
-    const child = spawn('npx', ['ts-node', '-r', 'tsconfig-paths/register', 'src/services/twilio/twilio-handler.ts', Body]);
+    // Process the conversation message directly in the main process
+    const result = await handleConversationMessage(Body);
     
-    let stdout = '';
-    let stderr = '';
-    
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-      console.log('[HTTP] Child stdout:', data.toString());
-    });
-    
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.log('[HTTP] Child stderr:', data.toString());
-    });
-    
-    child.on('close', (code) => {
-      console.log('[HTTP] Child process exited with code:', code);
-      console.log('[HTTP] Child stdout:', stdout);
-      console.log('[HTTP] Child stderr:', stderr);
-      
-      if (code === 0) {
-        console.log('[HTTP] Twilio message processed successfully');
-        return res.status(200).json({ status: 'Message received and processed' });
-      } else {
-        console.error('[HTTP] Twilio message processing failed');
-        return res.status(500).json({ error: 'Failed to process message' });
-      }
-    });
-    
-    child.on('error', (err) => {
-      console.error('[HTTP] Error spawning child process:', err);
-      return res.status(500).json({ error: 'Failed to process message' });
-    });
+    if (result.success) {
+      console.log('[HTTP] Conversation message processed successfully:', result);
+      return res.status(200).json({ 
+        status: 'Message received and processed',
+        conversation: result
+      });
+    } else {
+      console.error('[HTTP] Conversation message processing failed:', result.error);
+      return res.status(500).json({ 
+        error: 'Failed to process message',
+        details: result.error
+      });
+    }
     
   } catch (err) {
-    console.error('[HTTP] Error handling Twilio message:', err);
+    console.error('[HTTP] Error handling conversation message:', err);
     return res.status(500).json({ error: 'Failed to process message' });
+  }
+});
+
+// New endpoint to get conversation status
+router.get('/status', (req, res) => {
+  try {
+    const status = getConversationStatus();
+    res.status(200).json({
+      status: 'success',
+      data: status
+    });
+  } catch (error) {
+    console.error('[HTTP] Error getting conversation status:', error);
+    res.status(500).json({ error: 'Failed to get conversation status' });
+  }
+});
+
+// New endpoint to reset conversation
+router.post('/reset', (req, res) => {
+  try {
+    const result = resetConversation();
+    res.status(200).json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    console.error('[HTTP] Error resetting conversation:', error);
+    res.status(500).json({ error: 'Failed to reset conversation' });
   }
 });
 
