@@ -13,7 +13,7 @@ config({ path: '.env.local' });
 
 const TARGET_NUMBER = process.env.TARGET_NUMBER!;
 if (!TARGET_NUMBER) {
-  throw new Error('TARGET_NUMBER is not defined in custom.env');
+  throw new Error('TARGET_NUMBER is not defined in .env');
 }
 
 const convoReply = getConversationScript();

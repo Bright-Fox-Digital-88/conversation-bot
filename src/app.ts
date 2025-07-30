@@ -12,6 +12,27 @@ app.use(express.urlencoded({ extended: true }));
 // CORS middleware
 app.use(cors());
 
+// Custom request logging middleware - logs ALL requests
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const timestamp = new Date().toISOString();
+  const port = process.env.PORT || 3000;
+  const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  
+  console.log(`\n🚀 [${timestamp}] REQUEST RECEIVED:`);
+  console.log(`📍 Port: ${port}`);
+  console.log(`🌐 URL: ${fullUrl}`);
+  console.log(`📝 Method: ${req.method}`);
+  console.log(`🔗 Path: ${req.path}`);
+  console.log(`📊 Query:`, req.query);
+  console.log(`📋 Headers:`, req.headers);
+  console.log(`📦 Body:`, req.body);
+  console.log(`👤 IP: ${req.ip || req.connection.remoteAddress}`);
+  console.log(`🔍 User Agent: ${req.get('User-Agent')}`);
+  console.log(`─`.repeat(80));
+  
+  next();
+});
+
 // Morgan logging middleware (development only)
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
