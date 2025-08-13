@@ -1,0 +1,230 @@
+{
+    "executionFlows": [
+      {
+        "endpoint": "POST /api/conversation/",
+        "description": "Handles incoming conversation messages from HTTP clients and processes them with optional reset/init commands.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Route POST /api/conversation/ to handleConversationMessage controller",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Validate and parse Body field; detect reset/init commands",
+            "logExample": "[ConversationController] Received webhook:",
+            "state": {
+              "inputs": { "body": { "Body": "string" } },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "reset && init",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Reset state, send first message, start timer",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "reset only",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Reset conversation state without sending",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "init only",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Send first message and start timer without reset",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "normal flow",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Send current conversation message and increment index",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "POST /api/conversation/twilio/status",
+        "description": "Receives Twilio SMS delivery status callbacks and logs results.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Route POST /api/conversation/twilio/status to handleTwilioStatusCallback",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Log MessageSid, status, to/from, and errors; respond 200 OK",
+            "logExample": "[ConversationController] 📞 Received Twilio status callback:",
+            "state": {
+              "inputs": { "body": { "MessageSid": "", "MessageStatus": "" } },
+              "changes": {}
+            }
+          }
+        ]
+      },
+      {
+        "endpoint": "POST /api/demo/",
+        "description": "Handles demo messages; requires both RESET and INIT commands, or returns error.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Route POST /api/demo/ to handleDemoMessage controller",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Validate message field; detect RESET, INIT, and status commands",
+            "logExample": "[DemoController] Processing message:",
+            "state": {
+              "inputs": { "body": { "message": "string" } },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "status",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Get conversation status and return",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "reset && init",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Service",
+                    "action": "Reset state, send first message, start timer (demo)",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "missing RESET or INIT",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Return 400 error indicating both commands required",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/demo/status",
+        "description": "Returns the current conversation status for the demo flow.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Route GET /api/demo/status to getDemoStatus controller",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 2,
+            "actor": "Service",
+            "action": "Get current index, message count, lastMessageTime, and isActive",
+            "state": { "inputs": {}, "changes": {} }
+          }
+        ]
+      },
+      {
+        "endpoint": "timer:conversation-runtime",
+        "description": "Runs conversation runtime timer to send system messages at 25 and 30 minutes.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Timer",
+            "action": "Increment elapsedMinutes every minute",
+            "state": { "inputs": { "timer": { "elapsedMinutes": 0 } }, "changes": {} },
+            "branches": [
+              {
+                "condition": "elapsedMinutes === 25",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Service",
+                    "action": "Send 5-minute warning system message",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "elapsedMinutes === 30",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Service",
+                    "action": "Send reset system message, reset index, stop timer",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "globalCommonResolution": {
+      "signature": "Service→Twilio→State update tail",
+      "appliesTo": [
+        "POST /api/conversation/",
+        "POST /api/demo/"
+      ],
+      "layers": [
+        {
+          "actor": "Service",
+          "action": "Prepare message from script based on current index",
+          "state": { "inputs": {}, "changes": {} }
+        },
+        {
+          "actor": "Twilio",
+          "action": "Send SMS via SDK with status callback",
+          "state": { "inputs": { "env": { "BOT_NUMBER": "", "STATUS_CALLBACK_URL": "" } }, "changes": {} }
+        },
+        {
+          "actor": "State",
+          "action": "Increment index, update messageCount and lastMessageTime",
+          "state": { "inputs": {}, "changes": { "currentIndex": "++", "messageCount": "++", "lastMessageTime": "ISO" } }
+        }
+      ]
+    }
+  }
+  

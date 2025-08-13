@@ -1,0 +1,101 @@
+Change Points
+
+Hey there AI, I hope that you can see generally how my system functions from the provided JSONs
+
+I have a broad overview below of what we are "trying" to get changed. Below that i will have more specific change points. 
+
+From there, I'll have some specific requests from you about what we need out of you regarding this. 
+
+
+So, right now this is a conversation AI demo being used to sell a product. v1 of this actually had no AI at all, it was just a way to get a heavily scripted conversation to play out on the salesmans phone. 
+
+NOW, however, im being asked to actually build a basic AI conversation tool. The requirements are low, we just need to make a simple conversation handler for vanilla GPT 5 via open ai API. These are demos so theres no need for fancy context compression systems. It is not being used at scale or for to many messages. There will be no eval steps or metaframing of the conversation, just an initial system message defining the broad purpose and behavior and a first USER message to get the AI to respond with a canned response. 
+
+After that, behaviors should proceed as normal, messages resolving respecting the inherent INIT and RESET behaviors. 
+
+The "normal flow" will now no longer follow a script, but it will still use its timeout features to detect and reset the conversation. 
+
+Now, we'll be introducing a new entity, which we'll use as a data store called "convsersations.json". It will live in /src/repositories/conversation/data/
+
+This convesation data store will be an object filled with keys, where the keys are phone numbers currently engaged in conversation with us. Inside they'll have an object with a timestamp of their creation. They'll also have a message-payload key with an object inside which will consist of the the API core settings (model, tokens, etc) current system messgae, user and assistant message state. 
+{
+	"+12322345678":
+		{
+			"timestamp": ISO
+			"timerId": "str"
+			"message-payload": {}
+		}
+}
+
+These will be referenced when twilio receives text messages from any number. 
+
+now, we should discuss our handleMessage row and routes. 
+
+Currently there is an evaluation of state, usually handled by parsing the message the user sent to determine if the triggers "RESET" and/or "INIT" are included. If so the controller engages the series of cases
+
+1. Reset & Init
+2. Reset Only
+3. Init Only
+4. Normal Flow
+
+Reset & Init currently 
+	1. Validates init and reset commands
+	2. Resets Conversation State
+	3. Sends first conversation message via Twilio
+	4. Starts 30 minute timer for follow up/reset messages
+
+Reset Only currently
+	1. Validates reset commond
+	2. Reset Conversation State
+
+Init Only
+	1. Validates init command
+	2. Sends first conversation message via Twilio
+	3. Starts 30 minute timer for follow up/reset messages
+
+Normal Flow
+	1. Validate Body, route to conversation handler
+	2. Load Conversation script and current index
+	3. Send next conversation via Twilio
+	4. increment index, update last message time and message count
+
+New Functionality (these should be broken out into functions and stored logically inside the system folders, along with their data models)
+
+	Resolve New Open AI Message 
+		Input: senderPhone, prompt-id
+		Go inside /src/repositories/prompts/data and match the prompt id to the json name, if no prompt found, use default as the id
+		Pull the result back
+		Use the elements defined with the JSON to make an open AI request (all open AI api text params should be in there, required or otherwise, including a format of the system and initial user message)
+		Send a text message to senderPhone containing message from Open AI
+		Appends Open Ai response to message payload
+		Updates Payload
+
+	Resolve Current Open AI Message
+		Input: senderPhone, senderMessage (this is the message the user texted twilio. it should be getting passed down through the stack)
+		Reference /src/repositories/conversation/data/conversation.json
+		Match the phone number
+		Reference the object inside
+		Append the user message to the message payload
+		Open AI request resolves message payload parameters to make the next message request
+		Send a text message to senderPhone containing message from Open AI
+		Appends Open Ai response to message payload
+		Updates Payload
+	
+	Clear conversations
+		Every day at midnight, all conversations in the conversation.json should be wiped
+
+
+
+
+Change Points
+
+handleConversation
+	-handle conversation must now take the senderPhone number from the twilio message as a required parameter.
+
+Reset & Init changes
+	1. Validates init and reset commands
+	2. Resets Conversation State
+		-This now happens as a lookup against conversations.json by key of the senderPhone
+		-It matches the key and finds its timer and kills the timer
+		-It matches the key and deletes it from conversations.json
+	4. Starts 30 minute timer for follow up/reset messages

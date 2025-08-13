@@ -1,0 +1,349 @@
+{
+    "executionFlows": [
+      {
+        "endpoint": "POST /api/conversation",
+        "description": "Handles incoming conversation messages, parsing reset/init commands and routing to the appropriate conversation handler.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST request with conversation message",
+            "logExample": "[ConversationController] Received webhook:",
+            "state": {
+              "inputs": {
+                "body": {
+                  "Body": "Hello"
+                }
+              },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "shouldReset && shouldInit",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Call handleConversationWithReset with reset=true, init=true",
+                    "logExample": "[ConversationController] Reset + Init command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "shouldReset",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Call handleConversationWithReset with reset=true, init=false",
+                    "logExample": "[ConversationController] Reset command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "shouldInit",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Call handleConversationWithReset with reset=false, init=true",
+                    "logExample": "[ConversationController] Init command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "else",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Call handleConversationMessageService with Body",
+                    "logExample": "[ConversationController] Normal conversation flow",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "POST /api/conversation/twilio/status",
+        "description": "Processes Twilio status callback events for message delivery and logs status information.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST request from Twilio status callback",
+            "logExample": "[ConversationController] 📞 Received Twilio status callback:",
+            "state": {
+              "inputs": {
+                "body": {
+                  "MessageSid": "SM123",
+                  "MessageStatus": "delivered",
+                  "To": "+1234567890",
+                  "From": "+1987654321"
+                }
+              },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "delivered",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log message delivered",
+                    "logExample": "✅ Message delivered successfully!",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "undelivered",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log undelivered error",
+                    "logExample": "❌ Message undelivered!",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "failed",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log message failed",
+                    "logExample": "💥 Message failed!",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "sent",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log message sent to carrier",
+                    "logExample": "📤 Message sent to carrier",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "queued",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log message queued",
+                    "logExample": "⏳ Message queued for delivery",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "default",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Log generic message status",
+                    "logExample": "ℹ️ Message status:",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "POST /api/demo",
+        "description": "Handles demo conversation messages, requiring RESET and INIT commands in all caps, or responding to STATUS queries.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST request with demo message",
+            "logExample": "[DemoController] Processing message:",
+            "state": {
+              "inputs": {
+                "body": {
+                  "message": "RESET INIT"
+                }
+              },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "shouldStatus",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Return conversation status via getConversationStatus",
+                    "logExample": "[DemoController] Status request detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "shouldReset && shouldInit",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Call handleConversationWithReset with reset=true, init=true",
+                    "logExample": "[DemoController] Reset + Init command detected - proceeding with demo",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "else",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Controller",
+                    "action": "Return error requiring both RESET and INIT",
+                    "logExample": "[DemoController] Invalid demo command - missing RESET or INIT",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/demo/status",
+        "description": "Returns the current demo conversation status.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Controller",
+            "action": "Call getConversationStatus and return result",
+            "logExample": "[DemoController] Status retrieved",
+            "state": {
+              "inputs": {},
+              "changes": {}
+            }
+          }
+        ]
+      },
+      {
+        "endpoint": "timer:conversation-runtime",
+        "description": "Runs every minute after conversation init to track elapsed minutes and send timed system messages via Twilio.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Timer",
+            "action": "Increment elapsedMinutes by 1 each minute",
+            "state": {
+              "inputs": {
+                "timer": {
+                  "elapsedMinutes": 1
+                }
+              },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "elapsedMinutes === 25",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Twilio",
+                    "action": "Send 5-minute warning message",
+                    "state": {
+                      "inputs": {
+                        "body": "Demo Reset - 5 mins"
+                      },
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "elapsedMinutes === 30",
+                "steps": [
+                  {
+                    "step": 2,
+                    "actor": "Twilio",
+                    "action": "Send reset message",
+                    "state": {
+                      "inputs": {
+                        "body": "Demo Reset. Reply to begin"
+                      },
+                      "changes": {
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "step": 3,
+                    "actor": "Timer",
+                    "action": "Stop timer",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  

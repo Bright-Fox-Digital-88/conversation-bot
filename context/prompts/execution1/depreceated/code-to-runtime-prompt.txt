@@ -1,0 +1,135 @@
+You are given a single JSON object that is a data dump of a TypeScript/Node.js project’s file tree. It includes file paths, file contents (escaped strings), and types. Your job is to ANALYZE that dump and OUTPUT a single JSON object that linearizes runtime flows for ALL divergent HTTP endpoints and timer-driven paths, TRACKS step-level input state, and—when multiple flows converge into the same standardized logic—APPENDS a compact “common resolution” layer that captures that standardized tail behavior.
+
+IMPORTANT REQUIREMENTS
+- Do NOT invent endpoints, inputs, or code paths that are not present in the dump.
+- Follow the extraction rules precisely.
+- Output MUST be valid JSON matching the schema exactly.
+- Use concise, human-readable text derived from actual code.
+- Every endpoint/branch you include MUST be supported by code in the dump.
+- When multiple flows converge on the same sequence of actions (standardized business logic), summarize that tail once in a dedicated "commonResolution" block (see schema). Do NOT omit branch-specific steps that lead up to it.
+
+INPUT FORMAT (what you receive)
+- A single JSON document with shape:
+  {
+    "name": "<root>",
+    "type": "dir",
+    "contents": [ FileNode | DirNode, ... ]
+  }
+- File node: { "name": "<filename>", "type": "<ext or 'file'>", "contents": "<escaped source code string>" }
+- Directory node: { "name": "<dirname>", "type": "dir", "contents": [ ... ] }
+
+OUTPUT FORMAT (what you must return)
+Return exactly one JSON object with this top-level shape:
+
+{
+  "executionFlows": [
+    {
+      "endpoint": "STRING",                        // e.g., "POST /api/conversation" or "timer:conversation-reset"
+      "description": "STRING",
+      "steps": [
+        {
+          "step": NUMBER,                          // 1-based within THIS flow
+          "actor": "STRING",                       // "Express","Router","Middleware","Controller","Service","Twilio","State","Timer","System"
+          "action": "STRING",                      // concise description from code
+          "logExample": "STRING OPTIONAL",         // short (≤120 chars) real log snippet if available
+          "state": {
+            "inputs": {                            // values known at this step (only include fields actually read)
+              "body": { "field": "value" },
+              "query": { "param": "value" },
+              "params": { "name": "value" },
+              "env": { "VAR_NAME": "value" },
+              "headers": { "Header-Name": "value" },
+              "timer": { "elapsedMinutes": 25 }
+            },
+            "changes": {                           // fields modified/set at this step (e.g., state index increment)
+              "stateVar": "newValue"
+            }
+          },
+          "branches": [                            // OPTIONAL: only when the code has explicit branching here
+            {
+              "condition": "STRING",               // e.g., "reset && init", "delivered"
+              "steps": [ { ... step objects as above ... } ]
+            }
+          ]
+        }
+      ],
+      "commonResolution": {                        // OPTIONAL: include when THIS flow converges to a standardized tail
+        "appliesWhen": "STRING",                   // e.g., "after any branch that sends via Service"
+        "layers": [
+          {
+            "actor": "STRING",                     // e.g., "Service","Twilio","State","Controller"
+            "action": "STRING",                    // generalized tail behavior derived from repeated code paths
+            "state": {
+              "inputs": { ... },                   // minimal inputs that are common across converged paths
+              "changes": { ... }                   // common state mutations (e.g., increment index, persist timestamp)
+            },
+            "logExample": "STRING OPTIONAL"
+          }
+        ]
+      }
+    }
+  ],
+  "globalCommonResolution": {                      // OPTIONAL: only if ≥2 DISTINCT endpoints share an identical final tail
+    "signature": "STRING",                         // short name for the standardized tail, e.g., "Service→Twilio→State success tail"
+    "appliesTo": [ "POST /api/…", "POST /api/…" ], // list of endpoints whose tails are identical
+    "layers": [
+      { "actor": "Service", "action": "Prepare outbound message", "state": { "inputs": {}, "changes": {} } },
+      { "actor": "Twilio",  "action": "Send SMS via SDK",         "state": { "inputs": { "body": {}, "env": {} }, "changes": {} } },
+      { "actor": "State",   "action": "Persist index/time",        "state": { "inputs": {}, "changes": { "currentIndex": "++", "lastMessageTime": "ISO" } } }
+    ]
+  }
+}
+
+SCHEMA RULES & DEFAULTS
+- executionFlows: array, length ≥ 1.
+- endpoint: REQUIRED. For HTTP, use "METHOD /path". For timers/background jobs, use "timer:<name>".
+- description: REQUIRED (one sentence).
+- steps: REQUIRED, non-empty. Each step includes "state" with BOTH "inputs" and "changes" objects (use {} if none).
+- branches: OPTIONAL. Only when code shows explicit conditional logic.
+- commonResolution (per-flow): OPTIONAL. Include when THIS flow’s branches converge to the same standardized tail sequence.
+- globalCommonResolution (cross-flow): OPTIONAL. Include when two or more DISTINCT endpoints share an identical tail. Prefer this instead of duplicating identical per-flow tails.
+- Do NOT duplicate layers: if globalCommonResolution fully covers a flow’s tail, you may omit that flow’s commonResolution and rely on "appliesTo".
+- Keep actions short and concrete; reflect actual code.
+
+EXTRACTION RULES (derive flows + state + common resolution)
+1) ROUTES → ENDPOINTS
+   - Find Express routers and their mounts. Combine base mount paths with child routes to produce full endpoints.
+   - Each endpoint = one executionFlow.
+
+2) CONTROLLERS → INPUTS, BRANCHES, HANDOFF
+   - For each route handler, add a Controller step capturing accessed request inputs in state.inputs (body/query/params/headers).
+   - Capture env vars read at this step under state.inputs.env.
+   - If there’s an if/else or switch, add branches with conditions matching code predicates; within each branch, continue steps linearly.
+
+3) SERVICES → CORE ACTIONS + STATE
+   - Summarize service actions (send/reset/status/etc.). Include parameters passed in under state.inputs.
+   - Record state mutations (e.g., index++, timestamps) under state.changes.
+
+4) TWILIO → SEND + STATE
+   - For outbound sends, add a Twilio step with to/body/statusCallback in state.inputs.
+   - If responses affect persisted state, reflect that in state.changes.
+
+5) STATE MANAGEMENT → PERSISTENCE
+   - When saving to on-disk JSON or equivalent, record new values (index, messageCount, lastMessageTime, isActive) in state.changes.
+
+6) TIMERS/BACKGROUND → STATE
+   - Timer start: record timer init in state.changes.
+   - Timer tick: set state.inputs.timer.elapsedMinutes.
+   - 25/30-minute triggers: include system message text under state.inputs.body and any index reset in state.changes.
+
+7) COMMON RESOLUTION DETECTION (IMPORTANT)
+   - After building steps for all branches within a flow, compare the final N steps across branches.
+   - If ≥2 branches share an identical tail (same actor/action semantics and same kinds of state changes), extract that tail into "commonResolution" for that flow. Replace those duplicated tail steps in branches with a single "appliesWhen" reference.
+   - After processing all flows, compare tails ACROSS different endpoints. If ≥2 endpoints share the same tail, extract it into "globalCommonResolution" with an explicit "signature" and "appliesTo".
+
+QUALITY & CONSTRAINTS
+- No commentary outside the JSON.
+- Do NOT omit the divergent branch steps—common resolution is appended, not a substitute for branching detail.
+- Only summarize as "common" when tails are truly identical in behavior; otherwise keep them per-branch.
+- Preserve true step order before the common tail.
+- Use empty {} for "inputs"/"changes" when not applicable; never omit the "state" object.
+
+VALIDATION PASS (before you output)
+- Every flow has endpoint, description, steps (with state), and valid (optional) commonResolution.
+- If globalCommonResolution exists, "appliesTo" lists ≥2 endpoints and layers are generic enough to fit all listed flows.
+- JSON is syntactically valid.

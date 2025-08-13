@@ -1,0 +1,285 @@
+{
+    "executionFlows": [
+      {
+        "endpoint": "POST /api/conversation/",
+        "description": "Handles incoming conversation messages, processes reset/init commands, or forwards to conversation handler.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST /api/conversation/ with JSON body",
+            "state": {
+              "inputs": {
+                "body": { "Body": "string" }
+              },
+              "changes": {}
+            }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Validate Body field and parse reset/init commands",
+            "logExample": "[ConversationController] Received webhook:",
+            "state": {
+              "inputs": {
+                "body": { "Body": "value" }
+              },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "reset && init",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{handleConversationWithReset}} with reset=true, init=true",
+                    "functionRef": "{{handleConversationWithReset}}",
+                    "logExample": "[ConversationController] Reset + Init command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "reset only",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{handleConversationWithReset}} with reset=true, init=false",
+                    "functionRef": "{{handleConversationWithReset}}",
+                    "logExample": "[ConversationController] Reset command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "init only",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{handleConversationWithReset}} with reset=false, init=true",
+                    "functionRef": "{{handleConversationWithReset}}",
+                    "logExample": "[ConversationController] Init command detected",
+                    "state": {
+                      "inputs": {},
+                      "changes": {}
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": "normal flow",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{handleConversationMessage}} with Body",
+                    "functionRef": "{{handleConversationMessage}}",
+                    "logExample": "[ConversationController] Normal conversation flow",
+                    "state": {
+                      "inputs": {
+                        "body": { "Body": "value" }
+                      },
+                      "changes": {}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "commonResolution": {
+          "appliesWhen": "After any branch invoking conversation handler",
+          "layers": [
+            {
+              "actor": "Service",
+              "action": "Load conversation script from repository",
+              "state": { "inputs": {}, "changes": {} }
+            },
+            {
+              "actor": "Service",
+              "action": "Retrieve current index from stateManager",
+              "state": { "inputs": {}, "changes": {} }
+            },
+            {
+              "actor": "Service",
+              "action": "Send message via {{sendText}} to TARGET_NUMBER",
+              "functionRef": "{{sendText}}",
+              "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+            },
+            {
+              "actor": "State",
+              "action": "Increment current index, update lastMessageTime",
+              "state": { "inputs": {}, "changes": { "currentIndex": "++", "lastMessageTime": "ISO" } }
+            }
+          ]
+        }
+      },
+      {
+        "endpoint": "POST /api/conversation/twilio/status",
+        "description": "Receives Twilio delivery status callbacks for sent messages.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST /api/conversation/twilio/status with status payload",
+            "state": {
+              "inputs": { "body": { "MessageSid": "string", "MessageStatus": "string" } },
+              "changes": {}
+            }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Log status and handle by case (delivered, undelivered, failed, sent, queued, default)",
+            "logExample": "[ConversationController] 📞 Received Twilio status callback:",
+            "state": {
+              "inputs": { "body": { "MessageStatus": "value" } },
+              "changes": {}
+            }
+          },
+          {
+            "step": 3,
+            "actor": "Express",
+            "action": "Respond 200 OK",
+            "state": { "inputs": {}, "changes": {} }
+          }
+        ]
+      },
+      {
+        "endpoint": "POST /api/demo/",
+        "description": "Handles demo messages requiring both RESET and INIT, or returns status/error.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive POST /api/demo/ with JSON body",
+            "state": {
+              "inputs": { "body": { "message": "string" } },
+              "changes": {}
+            }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Validate message field, parse commands (RESET, INIT, status)",
+            "logExample": "[DemoController] Processing message:",
+            "state": {
+              "inputs": { "body": { "message": "value" } },
+              "changes": {}
+            },
+            "branches": [
+              {
+                "condition": "status request",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{getConversationStatus}} and return result",
+                    "functionRef": "{{getConversationStatus}}",
+                    "logExample": "[DemoController] Status request detected",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "RESET && INIT",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Call {{handleConversationWithReset}} with reset=true, init=true",
+                    "functionRef": "{{handleConversationWithReset}}",
+                    "logExample": "[DemoController] Reset + Init command detected - proceeding with demo",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              },
+              {
+                "condition": "invalid demo command",
+                "steps": [
+                  {
+                    "step": 3,
+                    "actor": "Controller",
+                    "action": "Return 400 with error for missing RESET or INIT",
+                    "logExample": "[DemoController] Invalid demo command - missing RESET or INIT",
+                    "state": { "inputs": {}, "changes": {} }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "commonResolution": {
+          "appliesWhen": "RESET && INIT branch",
+          "layers": [
+            {
+              "actor": "Service",
+              "action": "Reset state if requested, send first message via {{sendText}}, start timer",
+              "functionRef": "{{sendText}}",
+              "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": { "currentIndex": "1" } }
+            }
+          ]
+        }
+      },
+      {
+        "endpoint": "GET /api/demo/status",
+        "description": "Retrieves the current demo conversation status.",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Express",
+            "action": "Receive GET /api/demo/status",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 2,
+            "actor": "Controller",
+            "action": "Call {{getConversationStatus}} and return result",
+            "functionRef": "{{getConversationStatus}}",
+            "logExample": "[DemoController] Status retrieved",
+            "state": { "inputs": {}, "changes": {} }
+          }
+        ]
+      }
+    ],
+    "globalCommonResolution": {
+      "signature": "ConversationHandler tail",
+      "appliesTo": [
+        "POST /api/conversation/",
+        "POST /api/demo/"
+      ],
+      "layers": [
+        {
+          "actor": "Service",
+          "action": "Load conversation script from repository",
+          "state": { "inputs": {}, "changes": {} }
+        },
+        {
+          "actor": "Service",
+          "action": "Retrieve current index from stateManager",
+          "state": { "inputs": {}, "changes": {} }
+        },
+        {
+          "actor": "Service",
+          "action": "Send message via {{sendText}} to TARGET_NUMBER",
+          "functionRef": "{{sendText}}",
+          "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+        },
+        {
+          "actor": "State",
+          "action": "Increment current index, update lastMessageTime",
+          "state": { "inputs": {}, "changes": { "currentIndex": "++", "lastMessageTime": "ISO" } }
+        }
+      ]
+    }
+  }
+  
