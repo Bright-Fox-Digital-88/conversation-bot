@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S9",
+    "title": "Twilio Utility Compatibility Check",
+    "overview": "Confirm sendText(to, body) remains compatible with new flows. Add minimal typing if missing.",
+    "priority": {
+      "theming": 0.6,
+      "necessity": 0.65,
+      "complexity": 0.15,
+      "iterative_operability": 0.6,
+      "composite": 0.5,
+      "rationale": "Safety check to avoid runtime surprises."
+    },
+    "payload": {
+      "layout": [],
+      "files": [
+        {
+          "path": "src/utilities/twilio.ts",
+          "language": "typescript",
+          "content": "// VERIFY: sendText signature for AI flows.\n// export async function sendText(to: string, body: string): Promise<{ success: boolean; data?: any; error?: any }>; // TODO keep as-is if already implemented\n"
+        }
+      ]
+    },
+    "instructions": [
+      "If signature already matches, this will prepend as notes only."
+    ],
+    "checklist": [
+      "sendText resolves with { success: boolean }"
+    ],
+    "validators": [
+      {
+        "type": "grep",
+        "target": "src/utilities/twilio.ts",
+        "symbol": "sendText",
+        "path": "src/utilities/twilio.ts",
+        "pattern": "sendText"
+      }
+    ],
+    "cease_work_when": "Signature confirmed"
+  }
+}

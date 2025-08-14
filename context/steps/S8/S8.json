@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S8",
+    "title": "Daily Clear Scheduler",
+    "overview": "Add midnight task: cancel all timers and wipe conversations.json.",
+    "priority": {
+      "theming": 0.8,
+      "necessity": 0.75,
+      "complexity": 0.2,
+      "iterative_operability": 0.7,
+      "composite": 0.6625,
+      "rationale": "Keeps store clean. Simple in-process scheduler."
+    },
+    "payload": {
+      "layout": [
+        "src/scheduler"
+      ],
+      "files": [
+        {
+          "path": "src/scheduler/daily.ts",
+          "language": "typescript",
+          "content": "import { clearAllConversations } from '@services/conversation/conversationsStore';\nimport { cancelAllTimers } from '@services/conversation/timers';\n\nexport function scheduleDailyClear() {\n  const scheduleNext = () => {\n    const now = new Date();\n    const next = new Date(now);\n    next.setDate(now.getDate() + 1);\n    next.setHours(0, 0, 0, 0);\n    setTimeout(run, next.getTime() - now.getTime());\n  };\n  const run = () => {\n    cancelAllTimers();\n    clearAllConversations();\n    scheduleNext();\n  };\n  scheduleNext();\n}\n"
+        },
+        {
+          "path": "src/server.ts",
+          "language": "typescript",
+          "content": "// PATCH: bootstrap the daily clear scheduler.\nimport { scheduleDailyClear } from '@scheduler/daily';\n// NOTE: ensure this import runs at startup\nscheduleDailyClear();\n"
+        }
+      ]
+    },
+    "instructions": [
+      "In-process midnight schedule; can be replaced by cron later."
+    ],
+    "checklist": [
+      "Timers canceled at midnight",
+      "conversations.json wiped at midnight"
+    ],
+    "validators": [
+      {
+        "type": "typescript_import",
+        "target": "src/server.ts",
+        "symbol": "scheduleDailyClear"
+      }
+    ],
+    "cease_work_when": "Observed at midnight or via forced run"
+  }
+}

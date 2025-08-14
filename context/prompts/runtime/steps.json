@@ -1,0 +1,275 @@
+{
+    "project": "Parquet Generator — Safe, Phased Build",
+    "path": "context/steps/",
+    "prefix": "step",
+    "notes": "Each step is self-contained. The AI will ONLY see one step at a time. Do NOT rely on earlier context. Complete the checklist, then STOP. Do not write tests; use observable outcomes (files created, sizes, CLI output) as checks.",
+    "steps": [
+      {
+        "id": "P0",
+        "title": "Contracts & Scaffold",
+        "overview": "Establish the project skeleton and strict parameter/reference contracts so later steps have a stable surface.",
+        "scope_context": "This tool generates synthetic Parquet data and (later) uploads to S3. It is NOT a Glue job runner. Provide a CLI with plan/dry-run/run modes in later steps. Keep dependencies minimal: pandas, pyarrow, boto3 (boto3 used later).",
+        "files_to_edit": [
+          "pyproject.toml",
+          ".gitignore",
+          ".env.local",
+          "README.md",
+          "src/__init__.py",
+          "src/models/__init__.py",
+          "src/models/params.py",
+          "src/models/reference.py"
+        ],
+        "artifacts_to_create": [
+          ".env.local with placeholder AWS values (no secrets)",
+          "README.md section describing plan/dry-run/run at a high level"
+        ],
+        "instructions": [
+          "In src/models/params.py, define a strict payload contract (types, defaults, required fields). Include: rows (int), seed (int), compression (str: 'snappy'|'gzip'), output_local_dir (str, default './out'), s3 (object with bucket/prefix/region optional, used later), and any dataset knobs required by synthesis.",
+          "In src/models/reference.py, define lightweight types for reference data (e.g., Topic, WeightMap) used by generators.",
+          "In pyproject.toml, declare dependencies: pandas, pyarrow; pin to stable versions. (boto3 may be added later, but including it now is acceptable).",
+          "Create .gitignore entries for /out, __pycache__/, .DS_Store.",
+          "README.md: briefly state scope (generate & upload parquet), not a Glue runner."
+        ],
+        "checklist": [
+          "Schema file present: src/models/params.py exists and contains a documented Payload model.",
+          "Reference types present: src/models/reference.py exists with at least one reference type.",
+          "Dependencies declared: pyproject.toml includes pandas and pyarrow.",
+          "Safety files present: .gitignore and .env.local exist.",
+          "README includes a short Scope section (3–6 sentences)."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P1",
+        "title": "Deterministic Data Synthesis (Local)",
+        "overview": "Implement seeded, deterministic row generation and assemble a DataFrame using the payload and reference data.",
+        "scope_context": "Output is a pandas DataFrame in memory only (no file writes yet). Determinism means same payload+seed ⇒ same first N rows bitwise-equal.",
+        "files_to_edit": [
+          "src/services/__init__.py",
+          "src/services/dataset.py",
+          "src/services/record_factory.py",
+          "src/services/generators/__init__.py",
+          "src/services/generators/topic.py",
+          "src/services/generators/sha.py",
+          "src/services/scoring/__init__.py",
+          "src/services/scoring/beta.py",
+          "src/services/scoring/weights.py",
+          "src/services/url/__init__.py",
+          "src/services/url/tokenize.py",
+          "src/services/url/builder.py",
+          "src/utils/__init__.py",
+          "src/utils/rng.py",
+          "src/utils/idgen.py",
+          "src/utils/timegen.py",
+          "src/utils/netgeo.py",
+          "src/io/reference_loader.py"
+        ],
+        "artifacts_to_create": [
+          "In-memory DataFrame builder callable (no disk I/O).",
+          "Cached reference loader reading local CSV/JSON once per run."
+        ],
+        "instructions": [
+          "Create src/utils/rng.py exposing a seeded RNG factory; all generators must consume this RNG.",
+          "Implement src/services/record_factory.py to produce a single valid row using payload + references.",
+          "Implement src/services/dataset.py to batch-generate N rows efficiently from record_factory; allow chunking later.",
+          "Implement src/services/url/tokenize.py and src/services/url/builder.py to construct stable URL-like fields.",
+          "Implement src/services/scoring/weights.py and src/services/scoring/beta.py to compute a score deterministically from inputs.",
+          "Implement src/io/reference_loader.py with simple file read + in-memory cache (no re-reads per run)."
+        ],
+        "checklist": [
+          "Determinism dry-check: calling dataset.build() twice with identical payload+seed yields identical values for the first 100 rows across all columns.",
+          "Row count: DataFrame length equals payload.rows.",
+          "Dtype adherence: All generated columns align with the contract in src/models/params.py (string/int/float/date as declared).",
+          "Reference cache: Each reference source is read from disk at most once per run (document this behavior in code comments)."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P2",
+        "title": "Parquet Writer + Round-Trip",
+        "overview": "Persist the DataFrame to Parquet and confirm round-trip schema fidelity and non-zero file size.",
+        "scope_context": "Write locally to ./out by default; support compression toggle. Provide a simple reader utility for local validation.",
+        "files_to_edit": [
+          "src/io/parquet_writer.py",
+          "src/io/csv_writer.py",
+          "src/utils/size_estimator.py"
+        ],
+        "artifacts_to_create": [
+          "A .parquet file in ./out/",
+          "Optional golden CSV sample for visual spot-checks"
+        ],
+        "instructions": [
+          "Implement write_parquet(df, local_path, compression='snappy') with overwrite safety (fail unless an explicit overwrite flag/param is true).",
+          "Implement a small read_parquet(local_path) helper inside parquet_writer.py for local verification use.",
+          "Create src/utils/size_estimator.py to estimate bytes from schema + rows to power plan mode in P3.",
+          "Optional: src/io/csv_writer.py to write a small CSV sample (e.g., first 100 rows)."
+        ],
+        "checklist": [
+          "File produced: a .parquet file exists under ./out/ and file size > 0 bytes.",
+          "Round-trip: read_parquet(local_path) returns a DataFrame with the same column names and dtypes as the input.",
+          "Compression toggle works: running with 'snappy' vs 'gzip' creates files with different sizes (size_delta > 0).",
+          "Estimator sanity: estimated size and actual size are within 25% relative error."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P3",
+        "title": "CLI & Runner (plan / dry-run / run)",
+        "overview": "Expose a CLI entrypoint and a runner to plan the job, simulate without writes, and perform local writes.",
+        "scope_context": "Three modes: plan (no writes, prints plan), dry-run (build DataFrame only), run (write Parquet to ./out). Non-zero exit on invalid payload.",
+        "files_to_edit": [
+          "src/main.py",
+          "src/runners/__init__.py",
+          "src/runners/forge_runner.py"
+        ],
+        "artifacts_to_create": [
+          "Console output for plan mode listing columns, row_count, compression, estimated bytes",
+          "Parquet file(s) in ./out when using run mode"
+        ],
+        "instructions": [
+          "Implement a CLI in src/main.py with subcommands: plan, dry-run, run; accept a JSON payload path or JSON string.",
+          "Implement src/runners/forge_runner.py orchestrating dataset → parquet_writer (and csv_writer if enabled).",
+          "Ensure invalid payloads result in a clear error message and non-zero exit."
+        ],
+        "checklist": [
+          "plan: prints columns, row_count, seed, compression, and estimated_bytes to stdout.",
+          "dry-run: completes without creating files in ./out.",
+          "run: creates a .parquet file in ./out with non-zero size.",
+          "Invalid payload input yields non-zero process exit and a single-line error message."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P4",
+        "title": "S3 Uploader (Safe by Default)",
+        "overview": "Upload local artifacts to S3 reliably with retries and server-side encryption; use a staging key then promote to final.",
+        "scope_context": "Uploads should be atomic from a consumer’s perspective: write to staging, then copy/move to final; clean up staging on success.",
+        "files_to_edit": [
+          "src/io/s3_uploader.py",
+          "src/runners/forge_runner.py"
+        ],
+        "artifacts_to_create": [
+          "An S3 object at the final key",
+          "No lingering staging objects"
+        ],
+        "instructions": [
+          "Implement a multipart upload with exponential backoff retries and abort on failure.",
+          "Support SSE-S3 and optionally SSE-KMS via payload.s3 config or env vars (loaded from .env.local).",
+          "Adopt the pattern: upload to s3://<bucket>/<prefix>/staging/<run-id>/<file>, then copy/move to s3://<bucket>/<prefix>/final/<run-id>/<file>; delete staging on success.",
+          "Attach metadata headers such as seed and version."
+        ],
+        "checklist": [
+          "Final object exists at the documented final key (log the exact s3:// URI).",
+          "Staging object is removed after success.",
+          "At least one retry path is exercised and logged (simulate a transient failure through a code path guard).",
+          "Object metadata includes seed and version fields."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P5",
+        "title": "Manifest & Integrity",
+        "overview": "Produce a manifest file that describes the run and verify integrity before declaring success.",
+        "scope_context": "Manifest should live next to the Parquet (local and S3) and contain counts, sizes, hashes, and identifiers needed to trust the artifact.",
+        "files_to_edit": [
+          "src/runners/forge_runner.py",
+          "src/io/s3_uploader.py"
+        ],
+        "artifacts_to_create": [
+          "manifest.json stored alongside the parquet locally and in S3"
+        ],
+        "instructions": [
+          "Emit manifest.json containing: schema_hash, row_count, byte_size, md5/etag, payload_digest, version, timestamps, run_id, compression.",
+          "Before finishing the run, recompute these values from the produced artifact and compare to the manifest; if mismatch, log a clear diff and exit non-zero.",
+          "Ensure S3 uploader places manifest adjacent to parquet (same prefix, same run-id)."
+        ],
+        "checklist": [
+          "manifest.json exists alongside the parquet both locally and in S3.",
+          "Manifest row_count equals the DataFrame’s row count.",
+          "Manifest byte_size equals actual file size.",
+          "Schema hash/string in manifest matches recomputed value.",
+          "On intentional mismatch (toggle a guarded code path), process exits non-zero with a single-line diff summary."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P6",
+        "title": "Idempotency & Overwrite Policy",
+        "overview": "Ensure repeat runs with identical inputs do not create duplicate outputs unless explicitly allowed.",
+        "scope_context": "Default behavior is no-overwrite. Keys are namespaced by a deterministic run_id derived from payload_digest+seed unless provided manually.",
+        "files_to_edit": [
+          "src/utils/idgen.py",
+          "src/main.py",
+          "src/io/s3_uploader.py"
+        ],
+        "artifacts_to_create": [
+          "Stable, repeatable parquet+manifest pairs keyed by run_id"
+        ],
+        "instructions": [
+          "Implement deterministic run_id using payload digest + seed (e.g., sha256) with an option to override via CLI flag.",
+          "Default to no-overwrite locally and on S3; add --allow-overwrite to bypass.",
+          "When no-overwrite is active and outputs already exist, log a concise message and exit 0 without changing artifacts."
+        ],
+        "checklist": [
+          "Running twice with identical payload and no-overwrite produces no new files (local and S3).",
+          "Running with --allow-overwrite replaces exactly the same keys (log ETag or byte-size change).",
+          "Parquet and manifest contents remain byte-identical across idempotent reruns."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P7",
+        "title": "Observability & Ergonomics",
+        "overview": "Add structured logs and timings so users can quickly understand what happened and how long it took.",
+        "scope_context": "Logs should be parseable and include phase timings and throughput metrics without external tools.",
+        "files_to_edit": [
+          "src/runners/forge_runner.py",
+          "src/main.py"
+        ],
+        "artifacts_to_create": [
+          "Console logs including JSON-like lines for phase timings and throughput",
+          "Version string present in logs and manifest"
+        ],
+        "instructions": [
+          "Emit structured log lines for synth, write, upload (if configured): duration_ms, rows, bytes.",
+          "Add --debug to print a single sample row and a column map to stdout (ensure no secret fields).",
+          "Read version from pyproject.toml and include it in logs and manifest."
+        ],
+        "checklist": [
+          "Logs show duration_ms for synth, write, (and upload if used).",
+          "Rows/sec and bytes/sec are printed as positive numeric values.",
+          "One sample row and column map are printed when --debug is supplied.",
+          "Version string is present in both logs and manifest."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      },
+      {
+        "id": "P8",
+        "title": "Scale & Failure Drills",
+        "overview": "Harden for larger volumes and partial failures; ensure cleanup leaves no orphaned artifacts.",
+        "scope_context": "Large jobs should run within a predictable memory envelope. Failures must not leave stray local temp files or S3 staging keys.",
+        "files_to_edit": [
+          "src/services/dataset.py",
+          "src/io/parquet_writer.py",
+          "src/io/s3_uploader.py"
+        ],
+        "artifacts_to_create": [
+          "Chunked write behavior (documented in code comments)",
+          "No orphaned temp files or staging keys after simulated failures"
+        ],
+        "instructions": [
+          "Add chunked synth/write in dataset.py → parquet_writer.py to cap memory use (document a target cap in comments).",
+          "Introduce guarded failure hooks (e.g., fail_after_part=N) to simulate partial uploads/writes.",
+          "Ensure cleanup removes local temp files and S3 staging objects on failure paths."
+        ],
+        "checklist": [
+          "A large run (e.g., >= 10M rows) completes without out-of-memory; log the observed peak memory if available.",
+          "After success: local temp directory contains 0 leftover temp files.",
+          "After simulated failure: local temp files and S3 staging keys are removed (none remain).",
+          "Throughput (rows/sec, bytes/sec) is emitted and > 0."
+        ],
+        "cease_work_when": "All checklist items are satisfied; STOP and do not proceed."
+      }
+    ]
+  }
+  

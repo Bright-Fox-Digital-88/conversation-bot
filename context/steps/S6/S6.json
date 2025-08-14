@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S6",
+    "title": "Controller Wiring: Twilio Webhook",
+    "overview": "Modify handleConversationMessage to use senderPhone from Twilio's From. Support branches: Reset+Init, Reset, Init, Normal. Normal calls aiMessage; Init flows call aiMessageNew and start per-phone timer. Accept optional promptId and targetNumber in body (targetNumber required for new/init paths).",
+    "priority": {
+      "theming": 0.95,
+      "necessity": 1,
+      "complexity": 0.5,
+      "iterative_operability": 0.95,
+      "composite": 0.925,
+      "rationale": "Primary integration point that turns HTTP/Twilio into conversation actions."
+    },
+    "payload": {
+      "layout": [],
+      "files": [
+        {
+          "path": "src/controllers/conversation.controller.ts",
+          "language": "typescript",
+          "content": "// PATCH: route Twilio 'From' as senderPhone; call ai services per branch.\nimport { Request, Response } from 'express';\nimport { aiMessageNew, aiMessage } from '@services/conversation/ai';\nimport { resetConversationFor } from '@services/conversation/reset';\n\nexport async function handleConversationMessage(req: Request, res: Response) {\n  const { Body, From, targetNumber, promptId } = req.body || {};\n  if (!From || typeof From !== 'string') {\n    res.status(400).json({ error: 'Missing Twilio From (senderPhone)' });\n    return;\n  }\n  const senderPhone = From;\n\n  try {\n    const text = typeof Body === 'string' ? Body : '';\n    const shouldReset = text.toLowerCase().includes('reset');\n    const shouldInit  = text.toLowerCase().includes('init');\n\n    if (shouldReset && shouldInit) {\n      resetConversationFor(senderPhone);\n      await aiMessageNew(senderPhone, promptId, targetNumber);\n      res.status(200).json({ ok: true, branch: 'reset+init' });\n      return;\n    }\n    if (shouldReset) {\n      resetConversationFor(senderPhone);\n      res.status(200).json({ ok: true, branch: 'reset' });\n      return;\n    }\n    if (shouldInit) {\n      await aiMessageNew(senderPhone, promptId, targetNumber);\n      res.status(200).json({ ok: true, branch: 'init' });\n      return;\n    }\n\n    if (!text.trim()) {\n      res.status(400).json({ error: 'Invalid or missing Body' });\n      return;\n    }\n    await aiMessage(senderPhone, text);\n    res.status(200).json({ ok: true, branch: 'normal' });\n  } catch (err: any) {\n    console.error('[ConversationController]', err);\n    res.status(500).json({ error: err?.message || 'Unhandled error' });\n  }\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Extract senderPhone from req.body.From.",
+      "Require targetNumber for init/new flows."
+    ],
+    "checklist": [
+      "All four branches reachable",
+      "Normal flow works without targetNumber",
+      "New/init flows require targetNumber and succeed"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/controllers/conversation.controller.ts",
+        "symbol": "handleConversationMessage"
+      }
+    ],
+    "cease_work_when": "Webhook tests pass"
+  }
+}

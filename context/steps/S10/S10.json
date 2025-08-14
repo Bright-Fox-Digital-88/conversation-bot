@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S10",
+    "title": "Legacy Script Flow: Deprecation Fence",
+    "overview": "Document deprecation or isolate legacy conversationHandler/conversationRuntime for demo-only path. Prevent accidental use in Twilio webhook.",
+    "priority": {
+      "theming": 0.7,
+      "necessity": 0.55,
+      "complexity": 0.2,
+      "iterative_operability": 0.55,
+      "composite": 0.4875,
+      "rationale": "Makes intent clear and avoids conflicting singletons."
+    },
+    "payload": {
+      "layout": [],
+      "files": [
+        {
+          "path": "src/services/conversation/conversationHandler.ts",
+          "language": "typescript",
+          "content": "// DEPRECATION NOTE: This scripted flow was superseded by per-sender AI flows.\n// Keep only if needed for strictly scripted demos. Do not import in Twilio webhook controller.\n"
+        },
+        {
+          "path": "src/services/conversation/conversationRuntime.ts",
+          "language": "typescript",
+          "content": "// DEPRECATION NOTE: Replaced by per-phone timers in src/services/conversation/timers.ts.\n// Avoid usage in new webhook paths.\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Prepend deprecation banners.",
+      "Ensure current controllers do not import these in the Twilio webhook path."
+    ],
+    "checklist": [
+      "Deprecated files contain banner comments",
+      "Webhook controller imports only new AI modules"
+    ],
+    "validators": [
+      {
+        "type": "grep_absence",
+        "target": "src/controllers/conversation.controller.ts",
+        "symbol": "handleConversationWithReset",
+        "path": "src/controllers/conversation.controller.ts",
+        "pattern": "handleConversationWithReset"
+      }
+    ],
+    "cease_work_when": "No legacy imports in webhook controller"
+  }
+}

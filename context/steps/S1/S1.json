@@ -1,0 +1,63 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S1",
+    "title": "Conversations Store (JSON-backed)",
+    "overview": "Add read/write helpers for /src/repositories/conversation/data/conversations.json keyed by senderPhone. Active conversations only.",
+    "priority": {
+      "theming": 0.9,
+      "necessity": 1,
+      "complexity": 0.3,
+      "iterative_operability": 0.85,
+      "composite": 0.88,
+      "rationale": "Needed for per-sender state before timers/AI can function."
+    },
+    "payload": {
+      "layout": [
+        "src/services/conversation"
+      ],
+      "files": [
+        {
+          "path": "src/services/conversation/conversationsStore.ts",
+          "language": "typescript",
+          "content": "import fs from 'fs';\nimport path from 'path';\nimport { ConversationEntry } from '@models/conversation/session.model';\n\nconst FILE = path.resolve(process.cwd(), 'src', 'repositories', 'conversation', 'data', 'conversations.json');\n\nfunction readAll(): Record<string, ConversationEntry> {\n  if (!fs.existsSync(FILE)) return {};\n  return JSON.parse(fs.readFileSync(FILE, 'utf8'));\n}\nfunction writeAll(data: Record<string, ConversationEntry>) {\n  fs.writeFileSync(FILE, JSON.stringify(data, null, 2));\n}\n\nexport function getConversation(senderPhone: string): ConversationEntry | undefined {\n  return readAll()[senderPhone];\n}\nexport function upsertConversation(senderPhone: string, patch: Partial<ConversationEntry>) {\n  const all = readAll();\n  const existing = all[senderPhone] ?? {\n    timestamp: new Date().toISOString(),\n    timerId: null,\n    targetNumber: '',\n    messagePayload: { model: '', api_params: {}, messages: [] }\n  } as ConversationEntry;\n  all[senderPhone] = { ...existing, ...patch } as ConversationEntry;\n  writeAll(all);\n}\nexport function deleteConversation(senderPhone: string) {\n  const all = readAll();\n  delete all[senderPhone];\n  writeAll(all);\n}\nexport function listActivePhones(): string[] {\n  return Object.keys(readAll());\n}\nexport function clearAllConversations(): string[] {\n  const phones = Object.keys(readAll());\n  writeAll({});\n  return phones;\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Persist and retrieve active conversations keyed by senderPhone.",
+      "No timers are stored here beyond a public token (string)."
+    ],
+    "checklist": [
+      "Upsert inserts/merges correctly",
+      "Delete removes a key",
+      "clearAllConversations empties the file and returns prior phone list"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/conversationsStore.ts",
+        "symbol": "getConversation"
+      },
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/conversationsStore.ts",
+        "symbol": "upsertConversation"
+      }
+    ],
+    "cease_work_when": "CRUD works locally"
+  }
+}

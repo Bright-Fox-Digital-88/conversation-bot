@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S7",
+    "title": "Controller Wiring: Demo Endpoint",
+    "overview": "Allow /api/demo/ to accept targetNumber in body and forward to aiMessageNew on RESET+INIT, preserving your demo semantics.",
+    "priority": {
+      "theming": 0.75,
+      "necessity": 0.7,
+      "complexity": 0.25,
+      "iterative_operability": 0.7,
+      "composite": 0.6,
+      "rationale": "Keeps demo-path parity while moving to AI-backed flow."
+    },
+    "payload": {
+      "layout": [],
+      "files": [
+        {
+          "path": "src/controllers/demo.controller.ts",
+          "language": "typescript",
+          "content": "// PATCH: demo accepts targetNumber and optional promptId; requires both RESET and INIT.\nimport { Request, Response } from 'express';\nimport { aiMessageNew } from '@services/conversation/ai';\nimport { resetConversationFor } from '@services/conversation/reset';\n\nexport async function handleDemoMessage(req: Request, res: Response): Promise<void> {\n  const { message, targetNumber, From, promptId } = req.body || {};\n  if (!message || typeof message !== 'string') { res.status(400).json({ error: 'Invalid or missing message field' }); return; }\n  if (!From || typeof From !== 'string') { res.status(400).json({ error: 'Missing From (senderPhone)' }); return; }\n  if (!targetNumber) { res.status(400).json({ error: 'Missing targetNumber' }); return; }\n\n  const shouldReset = message.includes('RESET');\n  const shouldInit  = message.includes('INIT');\n\n  if (shouldReset && shouldInit) {\n    resetConversationFor(From);\n    await aiMessageNew(From, promptId, targetNumber);\n    res.status(200).json({ status: 'Demo initiated successfully' });\n  } else {\n    res.status(400).json({ error: 'Demo requires both \"RESET\" and \"INIT\" (all caps)' });\n  }\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Ensure demo controller mirrors new-init behavior with targetNumber required."
+    ],
+    "checklist": [
+      "RESET+INIT path initializes via aiMessageNew",
+      "Errors on missing targetNumber or From"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/controllers/demo.controller.ts",
+        "symbol": "handleDemoMessage"
+      }
+    ],
+    "cease_work_when": "Demo roundtrip works"
+  }
+}

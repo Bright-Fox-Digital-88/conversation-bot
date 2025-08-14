@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S4",
+    "title": "AI Message Functions",
+    "overview": "Add aiMessageNew (bootstrap/init) and aiMessage (turn-taking) to operate on conversations.json and Twilio SMS.",
+    "priority": {
+      "theming": 0.9,
+      "necessity": 1,
+      "complexity": 0.45,
+      "iterative_operability": 0.9,
+      "composite": 0.9125,
+      "rationale": "Core flow that turns inputs into replies and persists turns."
+    },
+    "payload": {
+      "layout": [
+        "src/services/conversation"
+      ],
+      "files": [
+        {
+          "path": "src/services/conversation/ai.ts",
+          "language": "typescript",
+          "content": "import { loadPromptConfig } from '@repositories/prompts/prompt.repo';\nimport { getConversation, upsertConversation } from './conversationsStore';\nimport { generateChatCompletion } from '@services/openai/chat';\nimport { sendText } from '@utilities/twilio';\nimport { startTimerFor } from './timers';\nimport { MessagePayload } from '@models/conversation/session.model';\n\nexport async function aiMessageNew(senderPhone: string, promptId?: string, targetNumber?: string): Promise<void> {\n  const prompt = loadPromptConfig(promptId);\n  if (!targetNumber) throw new Error('targetNumber required for aiMessageNew');\n\n  const payload: MessagePayload = {\n    model: prompt.model,\n    api_params: prompt.api_params,\n    messages: [\n      { role: 'system', content: prompt.system },\n      { role: 'user', content: prompt.init_user }\n    ]\n  };\n\n  const { content } = await generateChatCompletion({ model: payload.model, messages: payload.messages, api_params: payload.api_params });\n  await sendText(targetNumber, content);\n\n  payload.messages.push({ role: 'assistant', content });\n  upsertConversation(senderPhone, { timestamp: new Date().toISOString(), targetNumber, messagePayload: payload });\n  startTimerFor(senderPhone, targetNumber);\n}\n\nexport async function aiMessage(senderPhone: string, senderMessage: string): Promise<void> {\n  const convo = getConversation(senderPhone);\n  if (!convo) throw new Error('No active conversation for this phone. Send INIT first.');\n\n  const { targetNumber, messagePayload } = convo;\n  messagePayload.messages.push({ role: 'user', content: senderMessage });\n\n  const { content } = await generateChatCompletion({ model: messagePayload.model, messages: messagePayload.messages, api_params: messagePayload.api_params });\n  await sendText(targetNumber, content);\n\n  messagePayload.messages.push({ role: 'assistant', content });\n  upsertConversation(senderPhone, { messagePayload });\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Bootstrap with system + init_user then append assistant and persist.",
+      "Normal flow appends user, calls OpenAI, appends assistant, persists."
+    ],
+    "checklist": [
+      "aiMessageNew persists a conversation and starts a timer",
+      "aiMessage reads, appends, generates, and persists"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/ai.ts",
+        "symbol": "aiMessageNew"
+      },
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/ai.ts",
+        "symbol": "aiMessage"
+      }
+    ],
+    "cease_work_when": "Manual SMS roundtrip works locally"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S2",
+    "title": "Per-Phone Timers",
+    "overview": "Introduce in-memory timers keyed by a public token stored on the conversation entry. Sends 5min/reset system messages and cancels on timeout.",
+    "priority": {
+      "theming": 0.85,
+      "necessity": 0.9,
+      "complexity": 0.35,
+      "iterative_operability": 0.8,
+      "composite": 0.83,
+      "rationale": "Timers are required for auto-reset and notification flow."
+    },
+    "payload": {
+      "layout": [
+        "src/services/conversation"
+      ],
+      "files": [
+        {
+          "path": "src/services/conversation/timers.ts",
+          "language": "typescript",
+          "content": "import { getSystemMessages } from '@repositories/conversation/conversation.repo';\nimport { sendText } from '@utilities/twilio';\nimport { getConversation, upsertConversation } from './conversationsStore';\n\nconst timers = new Map<string, NodeJS.Timeout>();\nfunction makeToken() { return `t_${Math.random().toString(36).slice(2,10)}`; }\n\nexport function startTimerFor(senderPhone: string, targetNumber: string): string {\n  const existing = getConversation(senderPhone)?.timerId;\n  if (existing) cancelTimerFor(existing);\n\n  const token = makeToken();\n  const sys = getSystemMessages();\n  let elapsed = 0;\n  const t = setInterval(async () => {\n    elapsed++;\n    if (elapsed === 25) await sendText(targetNumber, sys['5min']);\n    if (elapsed === 30) {\n      await sendText(targetNumber, sys['reset']);\n      cancelTimerFor(token);\n    }\n  }, 60_000);\n\n  timers.set(token, t);\n  upsertConversation(senderPhone, { timerId: token });\n  return token;\n}\n\nexport function cancelTimerFor(token: string) {\n  const t = timers.get(token);\n  if (t) clearInterval(t);\n  timers.delete(token);\n}\n\nexport function cancelAllTimers() {\n  for (const t of timers.values()) clearInterval(t);\n  timers.clear();\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "One timer per conversation via token; actual Timeout is not serialized.",
+      "5min reminder at 25, reset message at 30, then cancel."
+    ],
+    "checklist": [
+      "Starting a timer returns a token and persists it",
+      "cancelTimerFor stops an active timer",
+      "cancelAllTimers clears the map"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/timers.ts",
+        "symbol": "startTimerFor"
+      }
+    ],
+    "cease_work_when": "Manual test shows reminders firing as expected"
+  }
+}

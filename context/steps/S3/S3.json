@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S3",
+    "title": "OpenAI Chat Wrapper",
+    "overview": "Simple wrapper around the OpenAI Chat Completions API. All tunables come from JSON prompt config; API key from environment.",
+    "priority": {
+      "theming": 0.85,
+      "necessity": 0.95,
+      "complexity": 0.25,
+      "iterative_operability": 0.85,
+      "composite": 0.875,
+      "rationale": "Unblocks AI message funcs; isolated surface simplifies testing."
+    },
+    "payload": {
+      "layout": [
+        "src/services/openai"
+      ],
+      "files": [
+        {
+          "path": "src/services/openai/chat.ts",
+          "language": "typescript",
+          "content": "import OpenAI from 'openai';\n\nconst client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });\n\nexport async function generateChatCompletion(payload: {\n  model: string;\n  messages: Array<{role:'system'|'user'|'assistant'; content: string}>;\n  api_params: Record<string, any>;\n}): Promise<{ content: string }> {\n  const { model, messages, api_params } = payload;\n  const resp = await client.chat.completions.create({\n    model,\n    messages,\n    ...api_params\n  } as any);\n  const content = resp.choices?.[0]?.message?.content ?? '';\n  return { content };\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Use env var OPENAI_API_KEY.",
+      "No retries/backoff in this stub; keep minimal."
+    ],
+    "checklist": [
+      "Function returns assistant content string or empty string",
+      "Does not hardcode model/params"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/services/openai/chat.ts",
+        "symbol": "generateChatCompletion"
+      }
+    ],
+    "cease_work_when": "A test call returns text"
+  }
+}

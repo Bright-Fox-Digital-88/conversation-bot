@@ -22,4 +22,12 @@ However, there are some specifications.
 	- Complexity: The complexity that these files introduce into the system (which will correspond with the potential for bugs/breaks) Higher complexity taks are negatively weighted (meaning they appear in later steps)
 	- Iterative Operatbility: Understand that after some step, other steps may not be completed. So if there are 8 steps, the user may stop after 5 since their feature already works as intended. The goal should be, in as few steps as possible, to produce a working feature. This allows for the user to bank positive progress in git before tackling additional complexity (like applying scaling, security, middleware)
 
+As part of my input i am including two json that were used produced in another project. parquet-generator.json represents a "build" data set used in creation/updating of files in a codebase. it drops the file contents in, and if the file exists, it prepends its content as a commentary
+steps.json represents a phased implementation plan. this is also run through a script to create context for a coding AI about what components of a build to target. 
 
+
+Understand that the "content" of these JSON is immaterian, i am not building a parquet-generator. I am focused more on "form"
+
+I would like to produce a unified approach that i can write a new script for. it will generate/update files, while also parsing out work docs inside the context folder. 
+
+I do not want you to create the prompt yet, as we need to discuss inherent challenges and circumvent them. 

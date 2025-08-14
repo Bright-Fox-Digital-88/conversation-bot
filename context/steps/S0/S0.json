@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S0",
+    "title": "Contracts & Prompt Loader",
+    "overview": "Introduce per-sender conversation contracts and a prompt repo that must load default.json (or promptId) from /src/repositories/prompts/data. If default.json is missing, throw with console help. Aligns the codebase for AI-first flow.",
+    "priority": {
+      "theming": 0.95,
+      "necessity": 1,
+      "complexity": 0.25,
+      "iterative_operability": 0.9,
+      "composite": 0.92,
+      "rationale": "Core types + loader are prerequisites for AI message functions and controller wiring."
+    },
+    "payload": {
+      "layout": [
+        "src/models/conversation",
+        "src/repositories/prompts",
+        "src/repositories/prompts/data"
+      ],
+      "files": [
+        {
+          "path": "src/models/conversation/session.model.ts",
+          "language": "typescript",
+          "content": "/* Contracts for per-sender conversations and prompt configs. */\n\nexport interface PromptConfig {\n  model: string;\n  api_params: {\n    temperature?: number;\n    max_tokens?: number;\n    top_p?: number;\n    presence_penalty?: number;\n    frequency_penalty?: number;\n    [k: string]: any;\n  };\n  system: string;\n  init_user: string;\n}\n\nexport interface ChatMessage {\n  role: 'system' | 'user' | 'assistant';\n  content: string;\n}\n\nexport interface MessagePayload {\n  model: string;\n  api_params: Record<string, any>;\n  messages: ChatMessage[];\n}\n\nexport interface ConversationEntry {\n  timestamp: string;          // ISO\n  timerId: string | null;     // public token; actual Timeout held in memory\n  targetNumber: string;       // Twilio bot number to reply from\n  messagePayload: MessagePayload;\n}\n"
+        },
+        {
+          "path": "src/repositories/prompts/prompt.repo.ts",
+          "language": "typescript",
+          "content": "// Loads {promptId}.json or default.json from /src/repositories/prompts/data. Throws with help if default.json is missing.\nimport fs from 'fs';\nimport path from 'path';\nimport { PromptConfig } from '@models/conversation/session.model';\n\nconst DATA_DIR = path.resolve(process.cwd(), 'src', 'repositories', 'prompts', 'data');\n\nexport function loadPromptConfig(promptId?: string): PromptConfig {\n  const chosen = promptId ? `${promptId}.json` : 'default.json';\n  const chosenPath = path.join(DATA_DIR, chosen);\n  const defaultPath = path.join(DATA_DIR, 'default.json');\n\n  if (!fs.existsSync(defaultPath)) {\n    console.error('[Prompts] Missing default.json. It must exist with shape:', {\n      model: 'gpt-5',\n      api_params: { temperature: 0.7, max_tokens: 256, top_p: 1, presence_penalty: 0, frequency_penalty: 0 },\n      system: 'string',\n      init_user: 'string'\n    });\n    throw new Error('default.json not found in /src/repositories/prompts/data/');\n  }\n\n  const filePath = fs.existsSync(chosenPath) ? chosenPath : defaultPath;\n  return JSON.parse(fs.readFileSync(filePath, 'utf8')) as PromptConfig;\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Create session.model.ts with PromptConfig, ChatMessage, MessagePayload, and ConversationEntry interfaces.",
+      "Implement loadPromptConfig with fallback to default.json and console guidance if missing."
+    ],
+    "checklist": [
+      "session.model.ts exists with correct interfaces",
+      "prompt.repo.ts loads configs and falls back to default.json",
+      "Throws error with guidance if default.json missing"
+    ],
+    "validators": [
+      {
+        "type": "typescript_import",
+        "target": "src/repositories/prompts/prompt.repo.ts",
+        "symbol": "PromptConfig"
+      },
+      {
+        "type": "typescript_interface",
+        "target": "src/models/conversation/session.model.ts",
+        "symbol": "ConversationEntry"
+      }
+    ],
+    "cease_work_when": "Checklist passes"
+  }
+}

@@ -1,0 +1,436 @@
+{
+    "version": "1.0",
+    "runtime": {
+      "conventions": { "path_separator": "/", "root": ".", "encoding": "utf-8" },
+      "comment_styles": {
+        "python": { "line_prefix": "# " },
+        "typescript": { "line_prefix": "// " },
+        "text": { "line_prefix": "# " }
+      },
+      "apply_rules": {
+        "if_file_missing": "write_content_exactly",
+        "if_file_exists": "prepend_as_commented_block",
+        "final_report": true
+      }
+    },
+    "steps": [
+      {
+        "id": "S0",
+        "title": "Contracts & Prompt Loader",
+        "overview": "Introduce per-sender conversation contracts and a prompt repo that must load default.json (or promptId) from /src/repositories/prompts/data. If default.json is missing, throw with console help. Aligns the codebase for AI-first flow.",
+        "priority": {
+          "theming": 0.95,
+          "necessity": 1.0,
+          "complexity": 0.25,
+          "iterative_operability": 0.9,
+          "composite": 0.92,
+          "rationale": "Core types + loader are prerequisites for AI message functions and controller wiring."
+        },
+        "payload": {
+          "layout": [
+            "src/models/conversation",
+            "src/repositories/prompts",
+            "src/repositories/prompts/data"
+          ],
+          "files": [
+            {
+              "path": "src/models/conversation/session.model.ts",
+              "language": "typescript",
+              "content": "/* Contracts for per-sender conversations and prompt configs. */\n\nexport interface PromptConfig {\n  model: string;\n  api_params: {\n    temperature?: number;\n    max_tokens?: number;\n    top_p?: number;\n    presence_penalty?: number;\n    frequency_penalty?: number;\n    [k: string]: any;\n  };\n  system: string;\n  init_user: string;\n}\n\nexport interface ChatMessage {\n  role: 'system' | 'user' | 'assistant';\n  content: string;\n}\n\nexport interface MessagePayload {\n  model: string;\n  api_params: Record<string, any>;\n  messages: ChatMessage[];\n}\n\nexport interface ConversationEntry {\n  timestamp: string;          // ISO\n  timerId: string | null;     // public token; actual Timeout held in memory\n  targetNumber: string;       // Twilio bot number to reply from\n  messagePayload: MessagePayload;\n}\n"
+            },
+            {
+              "path": "src/repositories/prompts/prompt.repo.ts",
+              "language": "typescript",
+              "content": "// Loads {promptId}.json or default.json from /src/repositories/prompts/data. Throws with help if default.json is missing.\nimport fs from 'fs';\nimport path from 'path';\nimport { PromptConfig } from '@models/conversation/session.model';\n\nconst DATA_DIR = path.resolve(process.cwd(), 'src', 'repositories', 'prompts', 'data');\n\nexport function loadPromptConfig(promptId?: string): PromptConfig {\n  const chosen = promptId ? `${promptId}.json` : 'default.json';\n  const chosenPath = path.join(DATA_DIR, chosen);\n  const defaultPath = path.join(DATA_DIR, 'default.json');\n\n  if (!fs.existsSync(defaultPath)) {\n    console.error('[Prompts] Missing default.json. It must exist with shape:', {\n      model: 'gpt-5',\n      api_params: { temperature: 0.7, max_tokens: 256, top_p: 1, presence_penalty: 0, frequency_penalty: 0 },\n      system: 'string',\n      init_user: 'string'\n    });\n    throw new Error('default.json not found in /src/repositories/prompts/data/');\n  }\n\n  const filePath = fs.existsSync(chosenPath) ? chosenPath : defaultPath;\n  return JSON.parse(fs.readFileSync(filePath, 'utf8')) as PromptConfig;\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Create session.model.ts with PromptConfig, ChatMessage, MessagePayload, and ConversationEntry interfaces.",
+          "Implement loadPromptConfig with fallback to default.json and console guidance if missing."
+        ],
+        "checklist": [
+          "session.model.ts exists with correct interfaces",
+          "prompt.repo.ts loads configs and falls back to default.json",
+          "Throws error with guidance if default.json missing"
+        ],
+        "validators": [
+          { "type": "typescript_import", "target": "src/repositories/prompts/prompt.repo.ts", "symbol": "PromptConfig" },
+          { "type": "typescript_interface", "target": "src/models/conversation/session.model.ts", "symbol": "ConversationEntry" }
+        ],
+        "cease_work_when": "Checklist passes"
+      },
+      {
+        "id": "S1",
+        "title": "Conversations Store (JSON-backed)",
+        "overview": "Add read/write helpers for /src/repositories/conversation/data/conversations.json keyed by senderPhone. Active conversations only.",
+        "priority": {
+          "theming": 0.9,
+          "necessity": 1.0,
+          "complexity": 0.3,
+          "iterative_operability": 0.85,
+          "composite": 0.88,
+          "rationale": "Needed for per-sender state before timers/AI can function."
+        },
+        "payload": {
+          "layout": [
+            "src/services/conversation"
+          ],
+          "files": [
+            {
+              "path": "src/services/conversation/conversationsStore.ts",
+              "language": "typescript",
+              "content": "import fs from 'fs';\nimport path from 'path';\nimport { ConversationEntry } from '@models/conversation/session.model';\n\nconst FILE = path.resolve(process.cwd(), 'src', 'repositories', 'conversation', 'data', 'conversations.json');\n\nfunction readAll(): Record<string, ConversationEntry> {\n  if (!fs.existsSync(FILE)) return {};\n  return JSON.parse(fs.readFileSync(FILE, 'utf8'));\n}\nfunction writeAll(data: Record<string, ConversationEntry>) {\n  fs.writeFileSync(FILE, JSON.stringify(data, null, 2));\n}\n\nexport function getConversation(senderPhone: string): ConversationEntry | undefined {\n  return readAll()[senderPhone];\n}\nexport function upsertConversation(senderPhone: string, patch: Partial<ConversationEntry>) {\n  const all = readAll();\n  const existing = all[senderPhone] ?? {\n    timestamp: new Date().toISOString(),\n    timerId: null,\n    targetNumber: '',\n    messagePayload: { model: '', api_params: {}, messages: [] }\n  } as ConversationEntry;\n  all[senderPhone] = { ...existing, ...patch } as ConversationEntry;\n  writeAll(all);\n}\nexport function deleteConversation(senderPhone: string) {\n  const all = readAll();\n  delete all[senderPhone];\n  writeAll(all);\n}\nexport function listActivePhones(): string[] {\n  return Object.keys(readAll());\n}\nexport function clearAllConversations(): string[] {\n  const phones = Object.keys(readAll());\n  writeAll({});\n  return phones;\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Persist and retrieve active conversations keyed by senderPhone.",
+          "No timers are stored here beyond a public token (string)."
+        ],
+        "checklist": [
+          "Upsert inserts/merges correctly",
+          "Delete removes a key",
+          "clearAllConversations empties the file and returns prior phone list"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/services/conversation/conversationsStore.ts", "symbol": "getConversation" },
+          { "type": "typescript_function", "target": "src/services/conversation/conversationsStore.ts", "symbol": "upsertConversation" }
+        ],
+        "cease_work_when": "CRUD works locally"
+      },
+      {
+        "id": "S2",
+        "title": "Per-Phone Timers",
+        "overview": "Introduce in-memory timers keyed by a public token stored on the conversation entry. Sends 5min/reset system messages and cancels on timeout.",
+        "priority": {
+          "theming": 0.85,
+          "necessity": 0.9,
+          "complexity": 0.35,
+          "iterative_operability": 0.8,
+          "composite": 0.83,
+          "rationale": "Timers are required for auto-reset and notification flow."
+        },
+        "payload": {
+          "layout": [
+            "src/services/conversation"
+          ],
+          "files": [
+            {
+              "path": "src/services/conversation/timers.ts",
+              "language": "typescript",
+              "content": "import { getSystemMessages } from '@repositories/conversation/conversation.repo';\nimport { sendText } from '@utilities/twilio';\nimport { getConversation, upsertConversation } from './conversationsStore';\n\nconst timers = new Map<string, NodeJS.Timeout>();\nfunction makeToken() { return `t_${Math.random().toString(36).slice(2,10)}`; }\n\nexport function startTimerFor(senderPhone: string, targetNumber: string): string {\n  const existing = getConversation(senderPhone)?.timerId;\n  if (existing) cancelTimerFor(existing);\n\n  const token = makeToken();\n  const sys = getSystemMessages();\n  let elapsed = 0;\n  const t = setInterval(async () => {\n    elapsed++;\n    if (elapsed === 25) await sendText(targetNumber, sys['5min']);\n    if (elapsed === 30) {\n      await sendText(targetNumber, sys['reset']);\n      cancelTimerFor(token);\n    }\n  }, 60_000);\n\n  timers.set(token, t);\n  upsertConversation(senderPhone, { timerId: token });\n  return token;\n}\n\nexport function cancelTimerFor(token: string) {\n  const t = timers.get(token);\n  if (t) clearInterval(t);\n  timers.delete(token);\n}\n\nexport function cancelAllTimers() {\n  for (const t of timers.values()) clearInterval(t);\n  timers.clear();\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "One timer per conversation via token; actual Timeout is not serialized.",
+          "5min reminder at 25, reset message at 30, then cancel."
+        ],
+        "checklist": [
+          "Starting a timer returns a token and persists it",
+          "cancelTimerFor stops an active timer",
+          "cancelAllTimers clears the map"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/services/conversation/timers.ts", "symbol": "startTimerFor" }
+        ],
+        "cease_work_when": "Manual test shows reminders firing as expected"
+      },
+      {
+        "id": "S3",
+        "title": "OpenAI Chat Wrapper",
+        "overview": "Simple wrapper around the OpenAI Chat Completions API. All tunables come from JSON prompt config; API key from environment.",
+        "priority": {
+          "theming": 0.85,
+          "necessity": 0.95,
+          "complexity": 0.25,
+          "iterative_operability": 0.85,
+          "composite": 0.875,
+          "rationale": "Unblocks AI message funcs; isolated surface simplifies testing."
+        },
+        "payload": {
+          "layout": [
+            "src/services/openai"
+          ],
+          "files": [
+            {
+              "path": "src/services/openai/chat.ts",
+              "language": "typescript",
+              "content": "import OpenAI from 'openai';\n\nconst client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });\n\nexport async function generateChatCompletion(payload: {\n  model: string;\n  messages: Array<{role:'system'|'user'|'assistant'; content: string}>;\n  api_params: Record<string, any>;\n}): Promise<{ content: string }> {\n  const { model, messages, api_params } = payload;\n  const resp = await client.chat.completions.create({\n    model,\n    messages,\n    ...api_params\n  } as any);\n  const content = resp.choices?.[0]?.message?.content ?? '';\n  return { content };\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Use env var OPENAI_API_KEY.",
+          "No retries/backoff in this stub; keep minimal."
+        ],
+        "checklist": [
+          "Function returns assistant content string or empty string",
+          "Does not hardcode model/params"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/services/openai/chat.ts", "symbol": "generateChatCompletion" }
+        ],
+        "cease_work_when": "A test call returns text"
+      },
+      {
+        "id": "S4",
+        "title": "AI Message Functions",
+        "overview": "Add aiMessageNew (bootstrap/init) and aiMessage (turn-taking) to operate on conversations.json and Twilio SMS.",
+        "priority": {
+          "theming": 0.9,
+          "necessity": 1.0,
+          "complexity": 0.45,
+          "iterative_operability": 0.9,
+          "composite": 0.9125,
+          "rationale": "Core flow that turns inputs into replies and persists turns."
+        },
+        "payload": {
+          "layout": [
+            "src/services/conversation"
+          ],
+          "files": [
+            {
+              "path": "src/services/conversation/ai.ts",
+              "language": "typescript",
+              "content": "import { loadPromptConfig } from '@repositories/prompts/prompt.repo';\nimport { getConversation, upsertConversation } from './conversationsStore';\nimport { generateChatCompletion } from '@services/openai/chat';\nimport { sendText } from '@utilities/twilio';\nimport { startTimerFor } from './timers';\nimport { MessagePayload } from '@models/conversation/session.model';\n\nexport async function aiMessageNew(senderPhone: string, promptId?: string, targetNumber?: string): Promise<void> {\n  const prompt = loadPromptConfig(promptId);\n  if (!targetNumber) throw new Error('targetNumber required for aiMessageNew');\n\n  const payload: MessagePayload = {\n    model: prompt.model,\n    api_params: prompt.api_params,\n    messages: [\n      { role: 'system', content: prompt.system },\n      { role: 'user', content: prompt.init_user }\n    ]\n  };\n\n  const { content } = await generateChatCompletion({ model: payload.model, messages: payload.messages, api_params: payload.api_params });\n  await sendText(targetNumber, content);\n\n  payload.messages.push({ role: 'assistant', content });\n  upsertConversation(senderPhone, { timestamp: new Date().toISOString(), targetNumber, messagePayload: payload });\n  startTimerFor(senderPhone, targetNumber);\n}\n\nexport async function aiMessage(senderPhone: string, senderMessage: string): Promise<void> {\n  const convo = getConversation(senderPhone);\n  if (!convo) throw new Error('No active conversation for this phone. Send INIT first.');\n\n  const { targetNumber, messagePayload } = convo;\n  messagePayload.messages.push({ role: 'user', content: senderMessage });\n\n  const { content } = await generateChatCompletion({ model: messagePayload.model, messages: messagePayload.messages, api_params: messagePayload.api_params });\n  await sendText(targetNumber, content);\n\n  messagePayload.messages.push({ role: 'assistant', content });\n  upsertConversation(senderPhone, { messagePayload });\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Bootstrap with system + init_user then append assistant and persist.",
+          "Normal flow appends user, calls OpenAI, appends assistant, persists."
+        ],
+        "checklist": [
+          "aiMessageNew persists a conversation and starts a timer",
+          "aiMessage reads, appends, generates, and persists"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/services/conversation/ai.ts", "symbol": "aiMessageNew" },
+          { "type": "typescript_function", "target": "src/services/conversation/ai.ts", "symbol": "aiMessage" }
+        ],
+        "cease_work_when": "Manual SMS roundtrip works locally"
+      },
+      {
+        "id": "S5",
+        "title": "Reset Utility",
+        "overview": "Add resetConversationFor(senderPhone) to kill that phone's timer and remove it from conversations.json.",
+        "priority": {
+          "theming": 0.8,
+          "necessity": 0.9,
+          "complexity": 0.15,
+          "iterative_operability": 0.85,
+          "composite": 0.8,
+          "rationale": "A simple, testable primitive used by controller branches."
+        },
+        "payload": {
+          "layout": [
+            "src/services/conversation"
+          ],
+          "files": [
+            {
+              "path": "src/services/conversation/reset.ts",
+              "language": "typescript",
+              "content": "import { getConversation, deleteConversation } from './conversationsStore';\nimport { cancelTimerFor } from './timers';\n\nexport function resetConversationFor(senderPhone: string) {\n  const convo = getConversation(senderPhone);\n  if (convo?.timerId) cancelTimerFor(convo.timerId);\n  deleteConversation(senderPhone);\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Ensure timers are canceled before deleting the entry."
+        ],
+        "checklist": [
+          "Reset removes entry and no timer remains"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/services/conversation/reset.ts", "symbol": "resetConversationFor" }
+        ],
+        "cease_work_when": "Manual reset leaves no active timer"
+      },
+      {
+        "id": "S6",
+        "title": "Controller Wiring: Twilio Webhook",
+        "overview": "Modify handleConversationMessage to use senderPhone from Twilio's From. Support branches: Reset+Init, Reset, Init, Normal. Normal calls aiMessage; Init flows call aiMessageNew and start per-phone timer. Accept optional promptId and targetNumber in body (targetNumber required for new/init paths).",
+        "priority": {
+          "theming": 0.95,
+          "necessity": 1.0,
+          "complexity": 0.5,
+          "iterative_operability": 0.95,
+          "composite": 0.925,
+          "rationale": "Primary integration point that turns HTTP/Twilio into conversation actions."
+        },
+        "payload": {
+          "layout": [],
+          "files": [
+            {
+              "path": "src/controllers/conversation.controller.ts",
+              "language": "typescript",
+              "content": "// PATCH: route Twilio 'From' as senderPhone; call ai services per branch.\nimport { Request, Response } from 'express';\nimport { aiMessageNew, aiMessage } from '@services/conversation/ai';\nimport { resetConversationFor } from '@services/conversation/reset';\n\nexport async function handleConversationMessage(req: Request, res: Response) {\n  const { Body, From, targetNumber, promptId } = req.body || {};\n  if (!From || typeof From !== 'string') {\n    res.status(400).json({ error: 'Missing Twilio From (senderPhone)' });\n    return;\n  }\n  const senderPhone = From;\n\n  try {\n    const text = typeof Body === 'string' ? Body : '';\n    const shouldReset = text.toLowerCase().includes('reset');\n    const shouldInit  = text.toLowerCase().includes('init');\n\n    if (shouldReset && shouldInit) {\n      resetConversationFor(senderPhone);\n      await aiMessageNew(senderPhone, promptId, targetNumber);\n      res.status(200).json({ ok: true, branch: 'reset+init' });\n      return;\n    }\n    if (shouldReset) {\n      resetConversationFor(senderPhone);\n      res.status(200).json({ ok: true, branch: 'reset' });\n      return;\n    }\n    if (shouldInit) {\n      await aiMessageNew(senderPhone, promptId, targetNumber);\n      res.status(200).json({ ok: true, branch: 'init' });\n      return;\n    }\n\n    if (!text.trim()) {\n      res.status(400).json({ error: 'Invalid or missing Body' });\n      return;\n    }\n    await aiMessage(senderPhone, text);\n    res.status(200).json({ ok: true, branch: 'normal' });\n  } catch (err: any) {\n    console.error('[ConversationController]', err);\n    res.status(500).json({ error: err?.message || 'Unhandled error' });\n  }\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Extract senderPhone from req.body.From.",
+          "Require targetNumber for init/new flows."
+        ],
+        "checklist": [
+          "All four branches reachable",
+          "Normal flow works without targetNumber",
+          "New/init flows require targetNumber and succeed"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/controllers/conversation.controller.ts", "symbol": "handleConversationMessage" }
+        ],
+        "cease_work_when": "Webhook tests pass"
+      },
+      {
+        "id": "S7",
+        "title": "Controller Wiring: Demo Endpoint",
+        "overview": "Allow /api/demo/ to accept targetNumber in body and forward to aiMessageNew on RESET+INIT, preserving your demo semantics.",
+        "priority": {
+          "theming": 0.75,
+          "necessity": 0.7,
+          "complexity": 0.25,
+          "iterative_operability": 0.7,
+          "composite": 0.6,
+          "rationale": "Keeps demo-path parity while moving to AI-backed flow."
+        },
+        "payload": {
+          "layout": [],
+          "files": [
+            {
+              "path": "src/controllers/demo.controller.ts",
+              "language": "typescript",
+              "content": "// PATCH: demo accepts targetNumber and optional promptId; requires both RESET and INIT.\nimport { Request, Response } from 'express';\nimport { aiMessageNew } from '@services/conversation/ai';\nimport { resetConversationFor } from '@services/conversation/reset';\n\nexport async function handleDemoMessage(req: Request, res: Response): Promise<void> {\n  const { message, targetNumber, From, promptId } = req.body || {};\n  if (!message || typeof message !== 'string') { res.status(400).json({ error: 'Invalid or missing message field' }); return; }\n  if (!From || typeof From !== 'string') { res.status(400).json({ error: 'Missing From (senderPhone)' }); return; }\n  if (!targetNumber) { res.status(400).json({ error: 'Missing targetNumber' }); return; }\n\n  const shouldReset = message.includes('RESET');\n  const shouldInit  = message.includes('INIT');\n\n  if (shouldReset && shouldInit) {\n    resetConversationFor(From);\n    await aiMessageNew(From, promptId, targetNumber);\n    res.status(200).json({ status: 'Demo initiated successfully' });\n  } else {\n    res.status(400).json({ error: 'Demo requires both \"RESET\" and \"INIT\" (all caps)' });\n  }\n}\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Ensure demo controller mirrors new-init behavior with targetNumber required."
+        ],
+        "checklist": [
+          "RESET+INIT path initializes via aiMessageNew",
+          "Errors on missing targetNumber or From"
+        ],
+        "validators": [
+          { "type": "typescript_function", "target": "src/controllers/demo.controller.ts", "symbol": "handleDemoMessage" }
+        ],
+        "cease_work_when": "Demo roundtrip works"
+      },
+      {
+        "id": "S8",
+        "title": "Daily Clear Scheduler",
+        "overview": "Add midnight task: cancel all timers and wipe conversations.json.",
+        "priority": {
+          "theming": 0.8,
+          "necessity": 0.75,
+          "complexity": 0.2,
+          "iterative_operability": 0.7,
+          "composite": 0.6625,
+          "rationale": "Keeps store clean. Simple in-process scheduler."
+        },
+        "payload": {
+          "layout": [
+            "src/scheduler"
+          ],
+          "files": [
+            {
+              "path": "src/scheduler/daily.ts",
+              "language": "typescript",
+              "content": "import { clearAllConversations } from '@services/conversation/conversationsStore';\nimport { cancelAllTimers } from '@services/conversation/timers';\n\nexport function scheduleDailyClear() {\n  const scheduleNext = () => {\n    const now = new Date();\n    const next = new Date(now);\n    next.setDate(now.getDate() + 1);\n    next.setHours(0, 0, 0, 0);\n    setTimeout(run, next.getTime() - now.getTime());\n  };\n  const run = () => {\n    cancelAllTimers();\n    clearAllConversations();\n    scheduleNext();\n  };\n  scheduleNext();\n}\n"
+            },
+            {
+              "path": "src/server.ts",
+              "language": "typescript",
+              "content": "// PATCH: bootstrap the daily clear scheduler.\nimport { scheduleDailyClear } from '@scheduler/daily';\n// NOTE: ensure this import runs at startup\nscheduleDailyClear();\n"
+            }
+          ]
+        },
+        "instructions": [
+          "In-process midnight schedule; can be replaced by cron later."
+        ],
+        "checklist": [
+          "Timers canceled at midnight",
+          "conversations.json wiped at midnight"
+        ],
+        "validators": [
+          { "type": "typescript_import", "target": "src/server.ts", "symbol": "scheduleDailyClear" }
+        ],
+        "cease_work_when": "Observed at midnight or via forced run"
+      },
+      {
+        "id": "S9",
+        "title": "Twilio Utility Compatibility Check",
+        "overview": "Confirm sendText(to, body) remains compatible with new flows. Add minimal typing if missing.",
+        "priority": {
+          "theming": 0.6,
+          "necessity": 0.65,
+          "complexity": 0.15,
+          "iterative_operability": 0.6,
+          "composite": 0.5,
+          "rationale": "Safety check to avoid runtime surprises."
+        },
+        "payload": {
+          "layout": [],
+          "files": [
+            {
+              "path": "src/utilities/twilio.ts",
+              "language": "typescript",
+              "content": "// VERIFY: sendText signature for AI flows.\n// export async function sendText(to: string, body: string): Promise<{ success: boolean; data?: any; error?: any }>; // TODO keep as-is if already implemented\n"
+            }
+          ]
+        },
+        "instructions": [
+          "If signature already matches, this will prepend as notes only."
+        ],
+        "checklist": [
+          "sendText resolves with { success: boolean }"
+        ],
+        "validators": [
+          { "type": "grep", "target": "src/utilities/twilio.ts", "symbol": "sendText", "path": "src/utilities/twilio.ts", "pattern": "sendText" }
+        ],
+        "cease_work_when": "Signature confirmed"
+      },
+      {
+        "id": "S10",
+        "title": "Legacy Script Flow: Deprecation Fence",
+        "overview": "Document deprecation or isolate legacy conversationHandler/conversationRuntime for demo-only path. Prevent accidental use in Twilio webhook.",
+        "priority": {
+          "theming": 0.7,
+          "necessity": 0.55,
+          "complexity": 0.2,
+          "iterative_operability": 0.55,
+          "composite": 0.4875,
+          "rationale": "Makes intent clear and avoids conflicting singletons."
+        },
+        "payload": {
+          "layout": [],
+          "files": [
+            {
+              "path": "src/services/conversation/conversationHandler.ts",
+              "language": "typescript",
+              "content": "// DEPRECATION NOTE: This scripted flow was superseded by per-sender AI flows.\n// Keep only if needed for strictly scripted demos. Do not import in Twilio webhook controller.\n"
+            },
+            {
+              "path": "src/services/conversation/conversationRuntime.ts",
+              "language": "typescript",
+              "content": "// DEPRECATION NOTE: Replaced by per-phone timers in src/services/conversation/timers.ts.\n// Avoid usage in new webhook paths.\n"
+            }
+          ]
+        },
+        "instructions": [
+          "Prepend deprecation banners.",
+          "Ensure current controllers do not import these in the Twilio webhook path."
+        ],
+        "checklist": [
+          "Deprecated files contain banner comments",
+          "Webhook controller imports only new AI modules"
+        ],
+        "validators": [
+          { "type": "grep_absence", "target": "src/controllers/conversation.controller.ts", "symbol": "handleConversationWithReset", "path": "src/controllers/conversation.controller.ts", "pattern": "handleConversationWithReset" }
+        ],
+        "cease_work_when": "No legacy imports in webhook controller"
+      }
+    ]
+  }
+  

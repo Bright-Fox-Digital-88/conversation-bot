@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "runtime": {
+    "comment_styles": {
+      "python": {
+        "line_prefix": "# "
+      },
+      "typescript": {
+        "line_prefix": "// "
+      },
+      "text": {
+        "line_prefix": "# "
+      }
+    }
+  },
+  "step": {
+    "id": "S5",
+    "title": "Reset Utility",
+    "overview": "Add resetConversationFor(senderPhone) to kill that phone's timer and remove it from conversations.json.",
+    "priority": {
+      "theming": 0.8,
+      "necessity": 0.9,
+      "complexity": 0.15,
+      "iterative_operability": 0.85,
+      "composite": 0.8,
+      "rationale": "A simple, testable primitive used by controller branches."
+    },
+    "payload": {
+      "layout": [
+        "src/services/conversation"
+      ],
+      "files": [
+        {
+          "path": "src/services/conversation/reset.ts",
+          "language": "typescript",
+          "content": "import { getConversation, deleteConversation } from './conversationsStore';\nimport { cancelTimerFor } from './timers';\n\nexport function resetConversationFor(senderPhone: string) {\n  const convo = getConversation(senderPhone);\n  if (convo?.timerId) cancelTimerFor(convo.timerId);\n  deleteConversation(senderPhone);\n}\n"
+        }
+      ]
+    },
+    "instructions": [
+      "Ensure timers are canceled before deleting the entry."
+    ],
+    "checklist": [
+      "Reset removes entry and no timer remains"
+    ],
+    "validators": [
+      {
+        "type": "typescript_function",
+        "target": "src/services/conversation/reset.ts",
+        "symbol": "resetConversationFor"
+      }
+    ],
+    "cease_work_when": "Manual reset leaves no active timer"
+  }
+}
