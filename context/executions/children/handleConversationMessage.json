@@ -1,0 +1,181 @@
+{
+    "target": "handleConversationMessage(req,res)",
+    "entryFile": "src/controllers/conversation.controller.ts",
+    "description": "Processes incoming HTTP conversation messages, interprets reset/init commands, and triggers conversation handling services.",
+    "callGraph": {
+      "nodes": [
+        { "id": "n1", "name": "handleConversationMessage", "file": "src/controllers/conversation.controller.ts", "exported": true },
+        { "id": "n2", "name": "handleConversationWithReset", "file": "src/services/conversation/conversationHandler.ts", "exported": true },
+        { "id": "n3", "name": "handleConversationMessageService", "file": "src/services/conversation/conversationHandler.ts", "exported": true },
+        { "id": "n4", "name": "sendText", "file": "src/utilities/twilio.ts", "exported": true },
+        { "id": "n5", "name": "stateManager.incrementIndex", "file": "src/services/conversation/stateManager.ts", "exported": false },
+        { "id": "n6", "name": "stateManager.resetState", "file": "src/services/conversation/stateManager.ts", "exported": false },
+        { "id": "n7", "name": "startTimer", "file": "src/services/conversation/conversationRuntime.ts", "exported": true },
+        { "id": "n8", "name": "fs.writeFileSync", "file": "node:fs", "exported": true },
+        { "id": "n9", "name": "client.messages.create", "file": "twilio SDK", "exported": true }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "via": "await handleConversationWithReset(true|false, true|false)" },
+        { "from": "n1", "to": "n3", "via": "await handleConversationMessageService(Body)" },
+        { "from": "n2", "to": "n6", "via": "stateManager.resetState()" },
+        { "from": "n2", "to": "n4", "via": "sendText(TARGET_NUMBER, message)" },
+        { "from": "n2", "to": "n7", "via": "startTimer()" },
+        { "from": "n3", "to": "n4", "via": "sendText(TARGET_NUMBER, message)" },
+        { "from": "n4", "to": "n9", "via": "client.messages.create(messageParams)" },
+        { "from": "n5", "to": "n8", "via": "fs.writeFileSync(STATE_FILE_PATH, state)" },
+        { "from": "n6", "to": "n8", "via": "fs.writeFileSync(STATE_FILE_PATH, DEFAULT_STATE)" }
+      ]
+    },
+    "executionFlows": [
+      {
+        "flow": "reset && init",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Controller",
+            "action": "Validate Body, detect 'reset' and 'init' commands",
+            "state": { "inputs": { "body": { "Body": "string" } }, "changes": {} },
+            "logExample": "[ConversationController] Reset + Init command detected"
+          },
+          {
+            "step": 2,
+            "actor": "Service",
+            "action": "Reset conversation state",
+            "state": { "inputs": {}, "changes": { "currentIndex": 0, "isActive": false, "messageCount": 0, "lastMessageTime": "ISO" } }
+          },
+          {
+            "step": 3,
+            "actor": "Service",
+            "action": "Send first conversation message via Twilio",
+            "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+          },
+          {
+            "step": 4,
+            "actor": "Timer",
+            "action": "Start 30-minute interval timer for follow-up/reset messages",
+            "state": { "inputs": {}, "changes": { "timer": "setInterval" } }
+          }
+        ]
+      },
+      {
+        "flow": "reset only",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Controller",
+            "action": "Validate Body, detect 'reset' command",
+            "state": { "inputs": { "body": { "Body": "string" } }, "changes": {} },
+            "logExample": "[ConversationController] Reset command detected"
+          },
+          {
+            "step": 2,
+            "actor": "Service",
+            "action": "Reset conversation state",
+            "state": { "inputs": {}, "changes": { "currentIndex": 0, "isActive": false, "messageCount": 0, "lastMessageTime": "ISO" } }
+          }
+        ]
+      },
+      {
+        "flow": "init only",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Controller",
+            "action": "Validate Body, detect 'init' command",
+            "state": { "inputs": { "body": { "Body": "string" } }, "changes": {} },
+            "logExample": "[ConversationController] Init command detected"
+          },
+          {
+            "step": 2,
+            "actor": "Service",
+            "action": "Send first conversation message via Twilio",
+            "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+          },
+          {
+            "step": 3,
+            "actor": "Timer",
+            "action": "Start 30-minute interval timer for follow-up/reset messages",
+            "state": { "inputs": {}, "changes": { "timer": "setInterval" } }
+          }
+        ]
+      },
+      {
+        "flow": "normal flow",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Controller",
+            "action": "Validate Body, route to conversation handler",
+            "state": { "inputs": { "body": { "Body": "string" } }, "changes": {} },
+            "logExample": "[ConversationController] Normal conversation flow"
+          },
+          {
+            "step": 2,
+            "actor": "Service",
+            "action": "Load conversation script and current index",
+            "state": { "inputs": {}, "changes": {} }
+          },
+          {
+            "step": 3,
+            "actor": "Service",
+            "action": "Send next conversation message via Twilio",
+            "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+          },
+          {
+            "step": 4,
+            "actor": "State",
+            "action": "Increment index, update last message time and message count",
+            "state": { "inputs": {}, "changes": { "currentIndex": "++", "messageCount": "++", "lastMessageTime": "ISO" } }
+          }
+        ]
+      }
+    ],
+    "terminals": [
+      {
+        "kind": "twilio",
+        "where": "src/utilities/twilio.ts:sendText",
+        "summary": "Sends an SMS message using Twilio client.messages.create",
+        "evidence": "client.messages.create(messageParams)"
+      },
+      {
+        "kind": "fs-write",
+        "where": "src/services/conversation/stateManager.ts:saveState",
+        "summary": "Writes updated conversation state to conversation-state.json",
+        "evidence": "fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(state))"
+      },
+      {
+        "kind": "timer-start",
+        "where": "src/services/conversation/conversationRuntime.ts:startTimer",
+        "summary": "Starts an interval to send timed follow-up/reset messages",
+        "evidence": "setInterval(() => { ... }, 60 * 1000)"
+      },
+      {
+        "kind": "http-response",
+        "where": "src/controllers/conversation.controller.ts:handleConversationMessage",
+        "summary": "Sends JSON HTTP response to client",
+        "evidence": "res.status(...).json(...)"
+      }
+    ],
+    "globalCommonResolution": {
+      "signature": "ConversationHandler tail",
+      "appliesTo": [ "init only", "normal flow" ],
+      "layers": [
+        {
+          "actor": "Service",
+          "action": "Load conversation script from repository",
+          "state": { "inputs": {}, "changes": {} }
+        },
+        {
+          "actor": "Service",
+          "action": "Send message via Twilio",
+          "state": { "inputs": { "env": { "TARGET_NUMBER": "value" } }, "changes": {} }
+        },
+        {
+          "actor": "State",
+          "action": "Increment current index, update lastMessageTime and messageCount",
+          "state": { "inputs": {}, "changes": { "currentIndex": "++", "messageCount": "++", "lastMessageTime": "ISO" } }
+        }
+      ]
+    }
+  }
+  

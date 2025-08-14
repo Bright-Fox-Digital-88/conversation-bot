@@ -61,7 +61,7 @@ Normal Flow
 
 New Functionality (these should be broken out into functions and stored logically inside the system folders, along with their data models)
 
-	Resolve New Open AI Message 
+	 aiMessageNew
 		Input: senderPhone, prompt-id
 		Go inside /src/repositories/prompts/data and match the prompt id to the json name, if no prompt found, use default as the id
 		Pull the result back
@@ -70,7 +70,7 @@ New Functionality (these should be broken out into functions and stored logicall
 		Appends Open Ai response to message payload
 		Updates Payload
 
-	Resolve Current Open AI Message
+	aiMessage
 		Input: senderPhone, senderMessage (this is the message the user texted twilio. it should be getting passed down through the stack)
 		Reference /src/repositories/conversation/data/conversation.json
 		Match the phone number
@@ -98,4 +98,34 @@ Reset & Init changes
 		-This now happens as a lookup against conversations.json by key of the senderPhone
 		-It matches the key and finds its timer and kills the timer
 		-It matches the key and deletes it from conversations.json
+	3. Runs aiMessageNew
 	4. Starts 30 minute timer for follow up/reset messages
+
+Reset Only currently
+	1. Validates reset command
+	2. Resets Conversation State
+		-This now happens as a lookup against conversations.json by key of the senderPhone
+		-It matches the key and finds its timer and kills the timer
+		-It matches the key and deletes it from conversations.json
+
+Init Only
+	1. Validates init command
+	2. Runs aiMessageNew
+	4. Starts 30 minute timer for follow up/reset messages
+
+Normal Flow
+	1. Validate Body, route to conversation handler
+	2. Load Conversation script and current index
+	3. Run aiMessage
+	4. increment index, update last message time and message count
+
+
+It's possible that the aiMessage and aiMessageNew have items at the end (sending text messages and updating the conversation) that may need to be handled by a higher layer of functions. 
+
+What id like to do is first have you ask me any questions or things that might need clarification. 
+
+After that, I'd like to discuss what functions need to be added, and what functions need to be changed. 
+
+From there, we should make STUBs of each. 
+
+After that I'll guide you. 
