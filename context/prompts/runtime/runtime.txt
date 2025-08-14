@@ -1,0 +1,25 @@
+So here's the status
+
+I've got a conversation going with an AI that I have primed using a few documents. 1 is a giant JSON tree view of my codebase, which contains all my actual code, as well as execution flows of the program in JSON format of the broad high level paths as well as deeper business logic. 
+
+Finally, i attached a constitution.txt prompt that gives deep and detailed reasoning for changes id like to make to the program. They are well thought out, articulated, and specific. I then prompt the AI to ask me questions about my specifications so we can clear up any shortfalls. Once the understanding is clear, the AI will generally produce for me a list of
+
+Functions/files that need to be changed
+Functions/files that need to be added
+
+I have experience turning such context into a JSON that can be run through a script to generate STUB versions of all the files/functions required for a new code base. 
+
+I would like a prompt that helps me take the current context and do this for an existing codebase. 
+
+However, there are some specifications.
+
+1. I need stub designs of all the functions. ideally this will work in whatever language im specifying. stubs are obv for the functions. data models can be written from the top down since they are more deterministic. Stubs should include imports, funciton definitions, return definitions, and prompts for function logic contained within as comments
+
+2. I need these partitioned out as steps. This must be a primary consideration step. The steps should align by these important criteria
+
+	- Theming: The files in the step should be closely themed and coherently associated
+	- Necessity: The core necessity of the files to achieve baseline function. The higher the necessity, the more likely their step appears first.
+	- Complexity: The complexity that these files introduce into the system (which will correspond with the potential for bugs/breaks) Higher complexity taks are negatively weighted (meaning they appear in later steps)
+	- Iterative Operatbility: Understand that after some step, other steps may not be completed. So if there are 8 steps, the user may stop after 5 since their feature already works as intended. The goal should be, in as few steps as possible, to produce a working feature. This allows for the user to bank positive progress in git before tackling additional complexity (like applying scaling, security, middleware)
+
+
