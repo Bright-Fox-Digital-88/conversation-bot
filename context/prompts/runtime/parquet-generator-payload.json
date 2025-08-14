@@ -1,0 +1,163 @@
+{
+  "version": "1.0",
+  "runtime_instructions": "Create all directories in `layout`. For each item in `files`: if the file does NOT exist, write `content` exactly as provided. If the file already exists, PREPEND the entire `content` above existing contents, but comment out every line you prepend using `comment_styles` so the original code remains functionally unchanged. If a directory already exists, do nothing. At the end, print counts of created directories, created files, and prepended files, plus a list of paths written.",
+  "conventions": {
+    "path_separator": "/",
+    "root": ".",
+    "encoding": "utf-8"
+  },
+  "comment_styles": {
+    "python": { "line_prefix": "# " },
+    "text":   { "line_prefix": "# " }
+  },
+  "layout": [
+    "src",
+    "src/runners",
+    "src/services",
+    "src/services/generators",
+    "src/services/scoring",
+    "src/services/url",
+    "src/io",
+    "src/models",
+    "src/utils",
+    "out"
+  ],
+  "files": [
+    {
+      "path": "pyproject.toml",
+      "language": "text",
+      "content": "[build-system]\\nrequires = [\\\"setuptools>=61.0\\\"]\\nbuild-backend = \\\"setuptools.build_meta\\\"\\n\\n[project]\\nname = \\\"parquet-generator\\\"\\nversion = \\\"0.1.0\\\"\\ndescription = \\\"Synthetic Parquet data generator to trigger and validate Glue scoring flows\\\"\\nauthors = [{name=\\\"You\\\"}]\\nreadme = \\\"README.md\\\"\\nrequires-python = \\\">=3.10\\\"\\ndependencies = [\\n  \\\"pandas\\\",\\n  \\\"pyarrow\\\",\\n  \\\"boto3\\\",\\n  \\\"python-dotenv\\\",\\n  \\\"numpy\\\"\\n]\\n\\n[project.scripts]\\nparquet-forge = \\\"parquet_generator.src.main:main\\\"\\n"
+    },
+    {
+      "path": ".gitignore",
+      "language": "text",
+      "content": "# Python\\n__pycache__/\\n*.pyc\\n.venv/\\n.env\\nout/\\n.parquet_generator_cache/\\n"
+    },
+    {
+      "path": ".env.example",
+      "language": "text",
+      "content": "AWS_REGION=us-east-1\\nS3_BUCKET=your-bucket\\nS3_PREFIX=input/auto-sim/\\nS3_SHA_PREFIX=ref/golden-sha/\\nLOCAL_OUT=./out\\nKEYWORDS_CSV_S3=ref/keywords.csv\\nNON_AUTO_TOPICS_CSV_S3=ref/non_auto_topic_ids.csv\\nAUTO_TOPICS_CSV_S3=ref/auto_topic_ids.csv\\nRANDOM_WORDS_CSV_S3=ref/random_words.csv\\n"
+    },
+    {
+      "path": "README.md",
+      "language": "text",
+      "content": "# Parquet Generator\\n\\nGenerates a synthetic Parquet dataset and a companion CSV of \\\"golden\\\" SHA hashes, then uploads both to S3 to trigger and validate a Glue scoring job.\\n\\n## Quickstart\\n```bash\\npython -m venv .venv && source .venv/bin/activate\\npip install -e ./parquet_generator\\ncp .env.example .env\\npython -m parquet_generator.src.main \\\\ \\n  --target-gb 2.0 --pct-topic 60 --pct-sha 35 --pct-score 50 --avg-score 0.68 \\\\ \\n  --sha-unique-min 0.4 --sha-unique-max 0.8 --max-bucket-index 8 --seed 42\\n```\\n"
+    },
+
+    { "path": "src/__init__.py", "language": "python", "content": "# package init\\n" },
+    { "path": "src/runners/__init__.py", "language": "python", "content": "# runners package\\n" },
+    { "path": "src/services/__init__.py", "language": "python", "content": "# services package\\n" },
+    { "path": "src/services/generators/__init__.py", "language": "python", "content": "# generators subpackage\\n" },
+    { "path": "src/services/scoring/__init__.py", "language": "python", "content": "# scoring subpackage\\n" },
+    { "path": "src/services/url/__init__.py", "language": "python", "content": "# url subpackage\\n" },
+    { "path": "src/io/__init__.py", "language": "python", "content": "# io package\\n" },
+    { "path": "src/models/__init__.py", "language": "python", "content": "# models package\\n" },
+    { "path": "src/utils/__init__.py", "language": "python", "content": "# utils package\\n" },
+
+    {
+      "path": "src/main.py",
+      "language": "python",
+      "content": "# Project: Parquet Generator — Synthetic Data Wind Tunnel (generate → trigger)\\n# Context: Fabricates a controllable Parquet dataset + golden SHA CSV and uploads to S3;\\n#          downstream Glue job will filter, score, and partition for validation.\\n# IMPLEMENTATION PROMPT: Write working, production-lean code. Parse CLI & .env, seed RNGs,\\n# construct params, call runners.forge_runner.run(params), and print a concise run summary.\\n\\nfrom runners.forge_runner import run\\n\\n\\ndef main() -> None:\\n    \\\"\\\"\\\"CLI entrypoint for synthetic-data generation.\\n    - Parse args/env into a params object (target_gb, pct_topic/sha/score, avg_score, etc.).\\n    - Seed RNGs for reproducibility; hand off to run().\\n    - Emit summary: estimated vs actual rows, S3 URIs for parquet and golden CSV.\\n    \\\"\\\"\\\"\\n    # TODO: argparse + dotenv; build params and call run(params)\\n    pass\\n\\n\\nif __name__ == \\\"__main__\\\":\\n    main()\\n"
+    },
+    {
+      "path": "src/runners/forge_runner.py",
+      "language": "python",
+      "content": "# Orchestrator: load refs → estimate rows → synthesize → write → upload → summarize.\\n# IMPLEMENTATION PROMPT: Implement logging, error handling, and simple drift checks\\n# (intended vs observed pct-topic/sha/score and mean score).\\n\\nfrom models.params import GeneratorParams\\nfrom io.reference_loader import load_reference_data\\nfrom utils.size_estimator import calculate_row_count_from_size\\nfrom services.dataset import generate_dataset\\nfrom io.parquet_writer import write_parquet\\nfrom io.csv_writer import write_golden_sha_csv\\nfrom io.s3_uploader import upload_to_s3\\n\\n\\ndef run(params: GeneratorParams) -> None:\\n    \\\"\\\"\\\"Run a single synthetic data generation flow and place artifacts in S3.\\n    Steps:\\n      1) Load reference data (keywords, topics, random words, golden SHAs).\\n      2) Estimate row count from target GB using column specs or pilot sample.\\n      3) Generate DataFrame with designed + randomized fields.\\n      4) Write Parquet + golden CSV locally; upload both to S3.\\n      5) Print observed metrics (pct-topic/sha/score, mean score).\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/dataset.py",
+      "language": "python",
+      "content": "# Generates the full synthetic DataFrame using record_factory.\\n# IMPLEMENTATION PROMPT: Produce columns: up_id, sha256_lc_hm, page_url, category,\\n# ip_address, zip, lat, long, country, event_time_utc, score. Ensure schema matches Glue consumer.\\n\\nfrom typing import Dict, Any\\nimport pandas as pd\\n\\n\\ndef generate_dataset(n_rows: int, params: Dict[str, Any], reference_data: Dict[str, Any]) -> pd.DataFrame:\\n    \\\"\\\"\\\"Build the synthetic DataFrame row-by-row or vectorized using record_factory.\\n    Return a Pandas DataFrame ready to write as Parquet.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/record_factory.py",
+      "language": "python",
+      "content": "# Per-row construction: topic, golden SHA pick, URL build + score, and random net/geo/time.\\n# IMPLEMENTATION PROMPT: Mirror the scoring/tokenization logic expected in the Glue job.\\n\\nfrom typing import Dict, Any\\n\\n\\ndef generate_record(row_index: int, params: Dict[str, Any], reference_data: Dict[str, Any]) -> Dict[str, Any]:\\n    \\\"\\\"\\\"Return a single record dict with all required columns and a 'score' field.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/generators/topic.py",
+      "language": "python",
+      "content": "# Topic selection based on pct_topic; returns a topic_id stored in 'category'.\\n# IMPLEMENTATION PROMPT: Bernoulli on pct_topic → sample from auto or non-auto pools.\\n\\nimport random\\nfrom typing import Sequence\\n\\n\\ndef generate_topic_id(pct_topic: float, auto_topic_ids: Sequence[int], non_auto_topic_ids: Sequence[int], rng: random.Random) -> int:\\n    \\\"\\\"\\\"Return a topic_id sampled from AUTO or non-AUTO based on pct_topic.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/generators/sha.py",
+      "language": "python",
+      "content": "# Golden SHA picker with uniqueness band realism; else random 64-hex lowercase.\\n# IMPLEMENTATION PROMPT: On pct_sha hit, draw from golden list; otherwise synthesize.\\n\\nimport random\\nfrom typing import Sequence, Tuple\\n\\n\\ndef generate_sha256_lc_hm(pct_sha: float, golden_sha_list: Sequence[str], unique_band_range: Tuple[float, float], rng: random.Random) -> str:\\n    \\\"\\\"\\\"Return a SHA hash string, preferring golden list per pct_sha; enforce lowercase.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/scoring/beta.py",
+      "language": "python",
+      "content": "# Score generator using Beta distribution to target average with tunable tightness.\\n# IMPLEMENTATION PROMPT: alpha=avg*tightness, beta=(1-avg)*tightness; clamp [0,1].\\n\\nimport random\\n\\n\\ndef generate_score(avg_score: float, tightness: int, rng: random.Random) -> float:\\n    \\\"\\\"\\\"Return a float in [0,1] biased around avg_score using Beta parameters.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/scoring/weights.py",
+      "language": "python",
+      "content": "# Reverse-log weighting utilities for bucket indexes (0 strongest).\\n# IMPLEMENTATION PROMPT: Document constants; provide normalize helper.\\n\\nfrom typing import Iterable\\n\\n\\ndef reverse_log_weight(index: int) -> float:\\n    \\\"\\\"\\\"Map bucket index to weight (index 0 highest) via a reverse-log curve.\\n    \\\"\\\"\\\"\\n    pass\\n\\n\\ndef normalize_weights(weights: Iterable[float]) -> list[float]:\\n    \\\"\\\"\\\"Normalize weights to sum to 1.0 with safe fallback if sum is 0.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/url/builder.py",
+      "language": "python",
+      "content": "# URL builder: constructs domain + path with required keyword-bucket hits and computes score.\\n# IMPLEMENTATION PROMPT: Implement bucket instance logic, word counts, shuffling, slug rules.\\n\\nimport random\\nfrom typing import Sequence, Tuple\\nimport pandas as pd\\n\\n\\ndef generate_page_url(\\n    pct_score: float,\\n    avg_score: float,\\n    keywords_df: pd.DataFrame,  # columns: term,type,index\\n    random_words: Sequence[str],\\n    max_bucket_index: int,\\n    rng: random.Random\\n) -> tuple[str, float, list[int]]:\\n    \\\"\\\"\\\"Return (url, score, matched_indexes) for a single row; if not scored, score=0.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/services/url/tokenize.py",
+      "language": "python",
+      "content": "# Token helpers for path and domain construction.\\n# IMPLEMENTATION PROMPT: Ensure behavior matches Glue scorer tokenization.\\n\\nfrom typing import Sequence\\n\\n\\ndef slugify(words: Sequence[str]) -> str:\\n    \\\"\\\"\\\"Join words into a lowercase hyphen-separated slug for path segments.\\n    \\\"\\\"\\\"\\n    pass\\n\\n\\ndef domainify(words: Sequence[str]) -> str:\\n    \\\"\\\"\\\"Join words into a lowercase domain label without separators.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/io/reference_loader.py",
+      "language": "python",
+      "content": "# Reference loader for keywords/topics/golden/random words (local CSVs or s3://).\\n# IMPLEMENTATION PROMPT: Validate schemas, normalize columns, support S3 and local paths.\\n\\nfrom typing import Dict, Any\\n\\n\\ndef load_reference_data(source: str | dict, required_sets: list[str]) -> Dict[str, Any]:\\n    \\\"\\\"\\\"Return a dict containing reference datasets for generation.\\n    Expected keys: 'keywords', 'auto_topics', 'non_auto_topics', 'golden_sha', 'random_words'.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/io/parquet_writer.py",
+      "language": "python",
+      "content": "# Parquet writer for the synthetic dataset.\\n# IMPLEMENTATION PROMPT: Write Parquet with compression; return bytes written (best-effort via os.stat).\\n\\nimport pandas as pd\\n\\n\\ndef write_parquet(df: pd.DataFrame, local_path: str, compression: str = \\\"snappy\\\") -> int:\\n    \\\"\\\"\\\"Write DataFrame to Parquet and return approximate bytes written.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/io/csv_writer.py",
+      "language": "python",
+      "content": "# CSV writer for the golden SHA list.\\n# IMPLEMENTATION PROMPT: Single-column CSV named 'sha256_lc_hm'.\\n\\n\\ndef write_golden_sha_csv(golden_sha_list: list[str], local_path: str) -> int:\\n    \\\"\\\"\\\"Write the golden SHA list to CSV and return rows written.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/io/s3_uploader.py",
+      "language": "python",
+      "content": "# S3 uploader for artifacts.\\n# IMPLEMENTATION PROMPT: Use boto3 with env/instance creds; return s3 URI.\\n\\n\\ndef upload_to_s3(local_path: str, bucket: str, key: str, aws_region: str | None = None) -> str:\\n    \\\"\\\"\\\"Upload local_path to s3://bucket/key and return the s3 URI.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/models/params.py",
+      "language": "python",
+      "content": "# Parameter model for generator levers and destinations.\\n# IMPLEMENTATION PROMPT: Keep as the contract from CLI→runner.\\n\\nfrom dataclasses import dataclass\\n\\n\\n@dataclass\\nclass GeneratorParams:\\n    \\\"\\\"\\\"Capture all levers and I/O destinations for a single run.\\n    Larger System Context: Acts as the stable contract between main() and the runner.\\n    \\\"\\\"\\\"\\n    target_gb: float\\n    pct_topic: float\\n    pct_sha: float\\n    pct_score: float\\n    avg_score: float\\n    sha_unique_min: float\\n    sha_unique_max: float\\n    max_bucket_index: int\\n    seed: int | None = None\\n"
+    },
+    {
+      "path": "src/models/reference.py",
+      "language": "python",
+      "content": "# Lightweight typed containers for reference data.\\n# IMPLEMENTATION PROMPT: Ensure shapes/lengths align.\\n\\nfrom dataclasses import dataclass\\nfrom typing import Sequence\\n\\n\\n@dataclass\\nclass KeywordsRef:\\n    \\\"\\\"\\\"Keywords reference (parallel arrays).\\n    \\\"\\\"\\\"\\n    terms: list[str]\\n    types: list[str]\\n    indexes: list[int]\\n\\n\\n@dataclass\\nclass TopicsRef:\\n    auto_topic_ids: Sequence[int]\\n    non_auto_topic_ids: Sequence[int]\\n\\n\\n@dataclass\\nclass GoldenRef:\\n    sha_list: Sequence[str]\\n\\n\\n@dataclass\\nclass RandomWordsRef:\\n    words: Sequence[str]\\n"
+    },
+    {
+      "path": "src/utils/size_estimator.py",
+      "language": "python",
+      "content": "# Estimate row count from target size.\\n# IMPLEMENTATION PROMPT: Use avg lengths and compression heuristics; optional pilot parquet.\\n\\nfrom typing import Dict, Any\\n\\n\\ndef calculate_row_count_from_size(target_gb: float, column_specs: Dict[str, Any]) -> int:\\n    \\\"\\\"\\\"Return estimated number of rows to approximate target_gb.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/utils/rng.py",
+      "language": "python",
+      "content": "# Seeded RNG factories.\\n# IMPLEMENTATION PROMPT: Return (random.Random, numpy.random.Generator).\\n\\nimport random\\nimport numpy as np\\nfrom typing import Tuple\\n\\n\\ndef make_rng(seed: int | None) -> Tuple[random.Random, np.random.Generator]:\\n    \\\"\\\"\\\"Return seeded RNGs for reproducibility.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/utils/idgen.py",
+      "language": "python",
+      "content": "# up_id generator.\\n# IMPLEMENTATION PROMPT: UUID4/ULID acceptable; return string.\\n\\n\\ndef make_up_id() -> str:\\n    \\\"\\\"\\\"Return a unique up_id string.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/utils/netgeo.py",
+      "language": "python",
+      "content": "# Network/geo fakes.\\n# IMPLEMENTATION PROMPT: Plausible IPv4 + coarse zip/lat/long + country code.\\n\\nfrom typing import Tuple\\n\\n\\ndef fake_ip() -> str:\\n    \\\"\\\"\\\"Produce a plausible IPv4 literal.\\n    \\\"\\\"\\\"\\n    pass\\n\\n\\ndef fake_geo() -> Tuple[str, float, float]:\\n    \\\"\\\"\\\"Return (zip, lat, long).\\n    \\\"\\\"\\\"\\n    pass\\n\\n\\ndef fake_country() -> str:\\n    \\\"\\\"\\\"Return a plausible 2-letter country code.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    },
+    {
+      "path": "src/utils/timegen.py",
+      "language": "python",
+      "content": "# event_time_utc generator.\\n# IMPLEMENTATION PROMPT: Recent rolling window; return ISO-8601 UTC string.\\n\\nfrom datetime import datetime, timezone, timedelta\\nimport random\\n\\n\\ndef event_time_utc(rng: random.Random) -> str:\\n    \\\"\\\"\\\"Return an ISO-8601 UTC timestamp within a recent window.\\n    \\\"\\\"\\\"\\n    pass\\n"
+    }
+  ]
+}
