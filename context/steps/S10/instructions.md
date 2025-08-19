@@ -3,18 +3,6 @@
 ## Overview
 Document deprecation or isolate legacy conversationHandler/conversationRuntime for demo-only path. Prevent accidental use in Twilio webhook.
 
-## Priority
-```json
-{
-  "theming": 0.7,
-  "necessity": 0.55,
-  "complexity": 0.2,
-  "iterative_operability": 0.55,
-  "composite": 0.4875,
-  "rationale": "Makes intent clear and avoids conflicting singletons."
-}
-```
-
 ## Instructions
 - Prepend deprecation banners.
 - Ensure current controllers do not import these in the Twilio webhook path.
@@ -39,12 +27,14 @@ Document deprecation or isolate legacy conversationHandler/conversationRuntime f
 ## Cease Work When
 No legacy imports in webhook controller
 
-## Payload Manifest
-
-### Files (targets to create/prepend)
+## Fabrication Summary
 ```json
-[
-  "src/services/conversation/conversationHandler.ts",
-  "src/services/conversation/conversationRuntime.ts"
-]
+{
+  "created": [],
+  "prepended": [
+    "/Users/gordonligon/Desktop/dev/conversation-bot/src/services/conversation/conversationHandler.ts",
+    "/Users/gordonligon/Desktop/dev/conversation-bot/src/services/conversation/conversationRuntime.ts"
+  ],
+  "skippedNonText": []
+}
 ```

@@ -1,72 +1,66 @@
-import { handleConversationMessage, handleConversationWithReset, getConversationStatus, resetConversation } from '@services/conversation/conversationHandler';
+// FABRICATOR PREPEND — DO NOT REMOVE
+// Timestamp: 2025-08-18T10:53:09Z
+// Spec Version: 1.0
+// Target File: /Users/gordonligon/Desktop/dev/conversation-bot/src/controllers/demo.controller.ts
+//
+// ------------------------------------------------------------------------
+//
+// STUB PAYLOAD (commented copy follows)
+//
+// // PATCH: demo accepts targetNumber and optional promptId; requires both RESET and INIT.
+// import { Request, Response } from 'express';
+// import { aiMessageNew } from '@services/conversation/ai';
+// import { resetConversationFor } from '@services/conversation/reset';
+//
+// export async function handleDemoMessage(req: Request, res: Response): Promise<void> {
+//   const { message, targetNumber, From, promptId } = req.body || {};
+//   if (!message || typeof message !== 'string') { res.status(400).json({ error: 'Invalid or missing message field' }); return; }
+//   if (!From || typeof From !== 'string') { res.status(400).json({ error: 'Missing From (senderPhone)' }); return; }
+//   if (!targetNumber) { res.status(400).json({ error: 'Missing targetNumber' }); return; }
+//
+//   const shouldReset = message.includes('RESET');
+//   const shouldInit  = message.includes('INIT');
+//
+//   if (shouldReset && shouldInit) {
+//     resetConversationFor(From);
+//     await aiMessageNew(From, promptId, targetNumber);
+//     res.status(200).json({ status: 'Demo initiated successfully' });
+//   } else {
+//     res.status(400).json({ error: 'Demo requires both "RESET" and "INIT" (all caps)' });
+//   }
+// }
+//
+// NOTE: Existing file detected. The fabricator header and commented stub were prepended above.
+// Original content begins below.
+//
 import { Request, Response } from 'express';
+import { aiMessageNew } from '../services/conversation/ai';
+import { resetConversationFor } from '../services/conversation/reset';
 
 export async function handleDemoMessage(req: Request, res: Response): Promise<void> {
-  const { message } = req.body;
+  const { message, targetNumber, From, promptId } = req.body || {};
+  if (!message || typeof message !== 'string') { res.status(400).json({ error: 'Invalid or missing message field' }); return; }
+  if (!From || typeof From !== 'string') { res.status(400).json({ error: 'Missing From (senderPhone)' }); return; }
+  if (!targetNumber) { res.status(400).json({ error: 'Missing targetNumber' }); return; }
 
-  if (!message || typeof message !== 'string') {
-    res.status(400).json({ error: 'Invalid or missing message field' });
-    return;
-  }
+  const shouldReset = message.includes('RESET');
+  const shouldInit  = message.includes('INIT');
 
-  try {
-    console.log('[DemoController] Processing message:', message);
-    
-    // Parse commands at the controller level - must be ALL CAPS
-    const shouldReset = message.includes('RESET');
-    const shouldInit = message.includes('INIT');
-    const shouldStatus = message.toLowerCase().includes('status');
-    
-    // Handle status request
-    if (shouldStatus) {
-      console.log('[DemoController] Status request detected');
-      const status = getConversationStatus();
-      res.status(200).json({ 
-        status: 'Status retrieved', 
-        conversation: status 
-      });
-      return;
-    }
-    
-    // Demo ONLY accepts reset + init combination
-    if (shouldReset && shouldInit) {
-      console.log('[DemoController] Reset + Init command detected - proceeding with demo');
-      const result = await handleConversationWithReset(true, true);
-      
-      if (result.success) {
-        res.status(200).json({ 
-          status: 'Demo initiated successfully', 
-          conversation: result 
-        });
-      } else {
-        res.status(500).json({ 
-          error: 'Failed to initiate demo', 
-          details: result.error 
-        });
-      }
-    } else {
-      // Demo requires both reset and init - return error if missing either
-      console.log('[DemoController] Invalid demo command - missing RESET or INIT');
-      res.status(400).json({ 
-        error: 'Demo requires both "RESET" and "INIT" commands in the message (all caps)',
-        received: {
-          hasReset: shouldReset,
-          hasInit: shouldInit
-        }
-      });
-    }
-  } catch (err) {
-    console.error('[DemoController] Error handling message:', err);
-    res.status(500).json({ error: 'Failed to process message' });
+  if (shouldReset && shouldInit) {
+    resetConversationFor(From);
+    await aiMessageNew(From, promptId, targetNumber);
+    res.status(200).json({ status: 'Demo initiated successfully' });
+  } else {
+    res.status(400).json({ error: 'Demo requires both "RESET" and "INIT" (all caps)' });
   }
 }
 
 export async function getDemoStatus(req: Request, res: Response): Promise<void> {
   try {
-    const status = getConversationStatus();
+    // TODO: Implement status retrieval using new AI service
     res.status(200).json({ 
       status: 'Status retrieved', 
-      conversation: status 
+      conversation: { status: 'demo_mode' }
     });
   } catch (err) {
     console.error('[DemoController] Error getting status:', err);
@@ -76,10 +70,10 @@ export async function getDemoStatus(req: Request, res: Response): Promise<void> 
 
 export async function resetDemoConversation(req: Request, res: Response): Promise<void> {
   try {
-    const result = resetConversation();
+    // TODO: Implement reset using new AI service
     res.status(200).json({ 
       status: 'Conversation reset', 
-      conversation: result 
+      conversation: { status: 'reset' }
     });
   } catch (err) {
     console.error('[DemoController] Error resetting conversation:', err);

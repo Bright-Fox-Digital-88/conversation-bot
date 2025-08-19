@@ -1,3 +1,18 @@
+// FABRICATOR PREPEND — DO NOT REMOVE
+// Timestamp: 2025-08-18T10:59:32Z
+// Spec Version: 1.0
+// Target File: /Users/gordonligon/Desktop/dev/conversation-bot/src/services/conversation/conversationHandler.ts
+//
+// ------------------------------------------------------------------------
+//
+// STUB PAYLOAD (commented copy follows)
+//
+// // DEPRECATION NOTE: This scripted flow was superseded by per-sender AI flows.
+// // Keep only if needed for strictly scripted demos. Do not import in Twilio webhook controller.
+//
+// NOTE: Existing file detected. The fabricator header and commented stub were prepended above.
+// Original content begins below.
+//
 import { getConversationScript } from '@repositories/conversation/conversation.repo';
 import { sendText } from '@utilities/twilio';
 import { stateManager } from './stateManager';

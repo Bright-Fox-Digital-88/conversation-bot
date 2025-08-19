@@ -1,102 +1,127 @@
-import { handleConversationWithReset, handleConversationMessage as handleConversationMessageService } from '@services/conversation/conversationHandler';
+// FABRICATOR PREPEND — DO NOT REMOVE
+// Timestamp: 2025-08-18T10:49:41Z
+// Spec Version: 1.0
+// Target File: /Users/gordonligon/Desktop/dev/conversation-bot/src/controllers/conversation.controller.ts
+//
+// ------------------------------------------------------------------------
+//
+// STUB PAYLOAD (commented copy follows)
+//
+// // PATCH: route Twilio 'From' as senderPhone; call ai services per branch.
+// import { Request, Response } from 'express';
+// import { aiMessageNew, aiMessage } from '@services/conversation/ai';
+// import { resetConversationFor } from '@services/conversation/reset';
+//
+// export async function handleConversationMessage(req: Request, res: Response) {
+//   const { Body, From, targetNumber, promptId } = req.body || {};
+//   if (!From || typeof From !== 'string') {
+//     res.status(400).json({ error: 'Missing Twilio From (senderPhone)' });
+//     return;
+//   }
+//   const senderPhone = From;
+//
+//   try {
+//     const text = typeof Body === 'string' ? Body : '';
+//     const shouldReset = text.toLowerCase().includes('reset');
+//     const shouldInit  = text.toLowerCase().includes('init');
+//
+//     if (shouldReset && shouldInit) {
+//       resetConversationFor(senderPhone);
+//       await aiMessageNew(senderPhone, promptId, targetNumber);
+//       res.status(200).json({ ok: true, branch: 'reset+init' });
+//       return;
+//     }
+//     if (shouldReset) {
+//       resetConversationFor(senderPhone);
+//       res.status(200).json({ ok: true, branch: 'reset' });
+//       return;
+//     }
+//     if (shouldInit) {
+//       await aiMessageNew(senderPhone, promptId, targetNumber);
+//       res.status(200).json({ ok: true, branch: 'init' });
+//       return;
+//     }
+//
+//     if (!text.trim()) {
+//       res.status(400).json({ error: 'Invalid or missing Body' });
+//       return;
+//     }
+//     await aiMessage(senderPhone, text);
+//     res.status(200).json({ ok: true, branch: 'normal' });
+//   } catch (err: any) {
+//     console.error('[ConversationController]', err);
+//     res.status(500).json({ error: err?.message || 'Unhandled error' });
+//   }
+// }
+//
+// NOTE: Existing file detected. The fabricator header and commented stub were prepended above.
+// Original content begins below.
+//
+import { aiMessageNew, aiMessage } from '@services/conversation/ai';
+import { resetConversationFor } from '@services/conversation/reset';
 import { Request, Response } from 'express';
 
-// Twilio message handler
-export async function handleTwilioMessage(message: string): Promise<void> {
-  // Parse commands at the controller level
-  const shouldReset = message.toLowerCase().includes('reset');
-  const shouldInit = message.toLowerCase().includes('init');
-  
-  console.log('[ConversationController] Processing Twilio message:', {
-    message,
-    shouldReset,
-    shouldInit
-  });
-  
-  // Handle reset + init combination
-  if (shouldReset && shouldInit) {
-    console.log('[ConversationController] Reset + Init command detected');
-    await handleConversationWithReset(true, true);
-  }
-  // Handle reset only
-  else if (shouldReset) {
-    console.log('[ConversationController] Reset command detected');
-    await handleConversationWithReset(true, false);
-  }
-  // Handle init only
-  else if (shouldInit) {
-    console.log('[ConversationController] Init command detected');
-    await handleConversationWithReset(false, true);
-  }
-  // Normal conversation flow
-  else {
-    console.log('[ConversationController] Normal conversation flow');
-    await handleConversationWithReset(false, false);
-  }
-}
 
-// HTTP conversation message handler
+
+// HTTP conversation message handler - S6 Implementation
 export async function handleConversationMessage(req: Request, res: Response): Promise<void> {
-  const { Body } = req.body;
-
-  if (!Body || typeof Body !== 'string') {
-    res.status(400).json({ error: 'Invalid or missing Body field' });
+  const { Body, From, targetNumber, promptId } = req.body || {};
+  
+  if (!From || typeof From !== 'string') {
+    res.status(400).json({ error: 'Missing Twilio From (senderPhone)' });
     return;
   }
+  const senderPhone = From;
 
-  console.log('[ConversationController] Received webhook:', Body);
-  
   try {
-    // Parse commands at the controller level
-    const shouldReset = Body.toLowerCase().includes('reset');
-    const shouldInit = Body.toLowerCase().includes('init');
-    
-    let result: {
-      success: boolean;
-      message?: string;
-      currentIndex?: number;
-      totalMessages?: number;
-      error?: string;
-    };
-    
-    // Handle reset + init combination
+    const text = typeof Body === 'string' ? Body : '';
+    const shouldReset = text.toLowerCase().includes('reset');
+    const shouldInit = text.toLowerCase().includes('init');
+
+    console.log('[ConversationController] Processing Twilio message:', {
+      senderPhone,
+      text,
+      shouldReset,
+      shouldInit,
+      targetNumber,
+      promptId
+    });
+
     if (shouldReset && shouldInit) {
       console.log('[ConversationController] Reset + Init command detected');
-      result = await handleConversationWithReset(true, true);
+      resetConversationFor(senderPhone);
+      await aiMessageNew(senderPhone, promptId, targetNumber);
+      res.status(200).json({ ok: true, branch: 'reset+init' });
+      return;
     }
-    // Handle reset only
-    else if (shouldReset) {
+    if (shouldReset) {
       console.log('[ConversationController] Reset command detected');
-      result = await handleConversationWithReset(true, false);
+      resetConversationFor(senderPhone);
+      res.status(200).json({ ok: true, branch: 'reset' });
+      return;
     }
-    // Handle init only
-    else if (shouldInit) {
+    if (shouldInit) {
       console.log('[ConversationController] Init command detected');
-      result = await handleConversationWithReset(false, true);
+      if (!targetNumber) {
+        res.status(400).json({ error: 'targetNumber required for init flows' });
+        return;
+      }
+      await aiMessageNew(senderPhone, promptId, targetNumber);
+      res.status(200).json({ ok: true, branch: 'init' });
+      return;
     }
-    // Normal conversation flow
-    else {
-      console.log('[ConversationController] Normal conversation flow');
-      result = await handleConversationMessageService(Body);
-    }
-    
-    if (result.success) {
-      console.log('[ConversationController] Conversation message processed successfully:', result);
-      res.status(200).json({ 
-        status: 'Message received and processed',
-        conversation: result
-      });
-    } else {
-      console.error('[ConversationController] Conversation message processing failed:', result.error);
-      res.status(500).json({ 
-        error: 'Failed to process message',
-        details: result.error
-      });
+
+    if (!text.trim()) {
+      res.status(400).json({ error: 'Invalid or missing Body' });
+      return;
     }
     
-  } catch (err) {
-    console.error('[ConversationController] Error handling conversation message:', err);
-    res.status(500).json({ error: 'Failed to process message' });
+    console.log('[ConversationController] Normal conversation flow');
+    await aiMessage(senderPhone, text);
+    res.status(200).json({ ok: true, branch: 'normal' });
+  } catch (err: any) {
+    console.error('[ConversationController]', err);
+    res.status(500).json({ error: err?.message || 'Unhandled error' });
   }
 }
 

@@ -3,18 +3,6 @@
 ## Overview
 Add read/write helpers for /src/repositories/conversation/data/conversations.json keyed by senderPhone. Active conversations only.
 
-## Priority
-```json
-{
-  "theming": 0.9,
-  "necessity": 1,
-  "complexity": 0.3,
-  "iterative_operability": 0.85,
-  "composite": 0.88,
-  "rationale": "Needed for per-sender state before timers/AI can function."
-}
-```
-
 ## Instructions
 - Persist and retrieve active conversations keyed by senderPhone.
 - No timers are stored here beyond a public token (string).
@@ -43,18 +31,13 @@ Add read/write helpers for /src/repositories/conversation/data/conversations.jso
 ## Cease Work When
 CRUD works locally
 
-## Payload Manifest
-
-### Layout (directories to create)
+## Fabrication Summary
 ```json
-[
-  "src/services/conversation"
-]
-```
-
-### Files (targets to create/prepend)
-```json
-[
-  "src/services/conversation/conversationsStore.ts"
-]
+{
+  "created": [
+    "/Users/gordonligon/Desktop/dev/conversation-bot/src/services/conversation/conversationsStore.ts"
+  ],
+  "prepended": [],
+  "skippedNonText": []
+}
 ```

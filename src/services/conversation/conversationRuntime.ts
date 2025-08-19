@@ -1,3 +1,18 @@
+// FABRICATOR PREPEND — DO NOT REMOVE
+// Timestamp: 2025-08-18T10:59:32Z
+// Spec Version: 1.0
+// Target File: /Users/gordonligon/Desktop/dev/conversation-bot/src/services/conversation/conversationRuntime.ts
+//
+// ------------------------------------------------------------------------
+//
+// STUB PAYLOAD (commented copy follows)
+//
+// // DEPRECATION NOTE: Replaced by per-phone timers in src/services/conversation/timers.ts.
+// // Avoid usage in new webhook paths.
+//
+// NOTE: Existing file detected. The fabricator header and commented stub were prepended above.
+// Original content begins below.
+//
 import { ConversationState, SystemMessage } from '@models/conversation/conversation.model';
 import { getSystemMessages } from '@repositories/conversation/conversation.repo';
 import { sendText } from '@utilities/twilio';
