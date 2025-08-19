@@ -38,17 +38,19 @@ import { aiMessageNew } from '../services/conversation/ai';
 import { resetConversationFor } from '../services/conversation/reset';
 
 export async function handleDemoMessage(req: Request, res: Response): Promise<void> {
-  const { message, targetNumber, From, promptId } = req.body || {};
+  const { message, targetNumber, promptId } = req.body || {};
   if (!message || typeof message !== 'string') { res.status(400).json({ error: 'Invalid or missing message field' }); return; }
-  if (!From || typeof From !== 'string') { res.status(400).json({ error: 'Missing From (senderPhone)' }); return; }
   if (!targetNumber) { res.status(400).json({ error: 'Missing targetNumber' }); return; }
+
+  // For demo endpoint, targetNumber serves as both sender and recipient
+  const senderPhone = targetNumber;
 
   const shouldReset = message.includes('RESET');
   const shouldInit  = message.includes('INIT');
 
   if (shouldReset && shouldInit) {
-    resetConversationFor(From);
-    await aiMessageNew(From, promptId, targetNumber);
+    resetConversationFor(senderPhone);
+    await aiMessageNew(senderPhone, promptId, targetNumber);
     res.status(200).json({ status: 'Demo initiated successfully' });
   } else {
     res.status(400).json({ error: 'Demo requires both "RESET" and "INIT" (all caps)' });

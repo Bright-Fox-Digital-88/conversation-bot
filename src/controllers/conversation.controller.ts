@@ -72,6 +72,9 @@ export async function handleConversationMessage(req: Request, res: Response): Pr
     return;
   }
   const senderPhone = From;
+  
+  // For Twilio webhooks, default targetNumber to From if not provided
+  const effectiveTargetNumber = targetNumber || From;
 
   try {
     const text = typeof Body === 'string' ? Body : '';
@@ -84,13 +87,14 @@ export async function handleConversationMessage(req: Request, res: Response): Pr
       shouldReset,
       shouldInit,
       targetNumber,
+      effectiveTargetNumber,
       promptId
     });
 
     if (shouldReset && shouldInit) {
       console.log('[ConversationController] Reset + Init command detected');
       resetConversationFor(senderPhone);
-      await aiMessageNew(senderPhone, promptId, targetNumber);
+      await aiMessageNew(senderPhone, promptId, effectiveTargetNumber);
       res.status(200).json({ ok: true, branch: 'reset+init' });
       return;
     }
@@ -102,11 +106,7 @@ export async function handleConversationMessage(req: Request, res: Response): Pr
     }
     if (shouldInit) {
       console.log('[ConversationController] Init command detected');
-      if (!targetNumber) {
-        res.status(400).json({ error: 'targetNumber required for init flows' });
-        return;
-      }
-      await aiMessageNew(senderPhone, promptId, targetNumber);
+      await aiMessageNew(senderPhone, promptId, effectiveTargetNumber);
       res.status(200).json({ ok: true, branch: 'init' });
       return;
     }

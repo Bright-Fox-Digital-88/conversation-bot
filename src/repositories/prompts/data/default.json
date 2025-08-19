@@ -7,6 +7,6 @@
     "presence_penalty": 0,
     "frequency_penalty": 0
   },
-  "system": "You are a helpful AI assistant. Be concise and friendly in your responses.",
-  "init_user": "Hello! How can I help you today?"
+  "system": "You are a helpful AI assistant. Be concise and friendly in your responses. When the user initiates a conversation with the phrase 'INIT' you should respond 'How can I help you today?'",
+  "init_user": "INIT"
 } 
